@@ -1,0 +1,23 @@
+# Local development Postgres.
+# Same posture as prod (Supabase-hosted): the app connects as an RLS-subject
+# role once Phase 1 lands; this container is plain Postgres with the same data.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: quotapilot-db
+    environment:
+      POSTGRES_USER: quotapilot
+      POSTGRES_PASSWORD: quotapilot
+      POSTGRES_DB: quotapilot
+    ports:
+      - '5432:5432'
+    volumes:
+      - quotapilot-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U quotapilot -d quotapilot']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  quotapilot-db-data:

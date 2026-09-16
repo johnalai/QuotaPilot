@@ -1,0 +1,14 @@
+node_modules
+.pnpm-store
+.next
+out
+dist
+coverage
+.claude
+.remember
+pnpm-lock.yaml
+*.log
+.env
+.env.*
+!.env.example
+apps/web/.next

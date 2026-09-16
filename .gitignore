@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js / builds
+.next/
+out/
+build/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Environment — secrets never committed
+.env
+.env.*
+!.env.example
+
+# Local Postgres / Docker
+*.local
+pgdata/
+
+# Tool state
+.remember/
+.claude/settings.local.json
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*

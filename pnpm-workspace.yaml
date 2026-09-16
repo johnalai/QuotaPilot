@@ -1,0 +1,21 @@
+packages:
+  - apps/*
+  - packages/*
+
+# shadcn CLI's MCP SDK statically imports `zod/v3` (exported by zod ≥3.25 AND v4),
+# while shadcn itself needs the v3 API (`.deepPartial()`), so force zod ≥3.25 —
+# satisfies both dev tools. Note 3.25.0 itself shipped source-only (no dist/);
+# the override allows any later 3.25.x patch, which ship dist/. When
+# packages/contracts pins zod for the app, keep it ≥3.25 (or v4) and drop this.
+overrides:
+  zod: '^3.25.76'
+
+allowBuilds:
+  esbuild: true
+
+# Single-source dependency versions for all workspace packages.
+catalog:
+  typescript: ^5.8.0
+  vitest: ^3.2.0
+  prettier: ^3.5.0
+  zod: ^3.25.76
