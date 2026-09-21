@@ -1,0 +1,173 @@
+// QuotaPilot · Phase 1 production schema (Slice 2).
+//
+// Posture (architecture §7, docs/phase-1-slice-1.md):
+//   - The app runtime connects as a non-owner app role subject to RLS
+//     (NOBYPASSRLS). Ownership/migrations use a separate owner role.
+//   - Tenant-scoped tables (`membership`, `invite`) carry `organization_id`
+//     and an RLS policy on the null-safe claim predicate:
+//       NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'org_id'
+//   - `organization` is NOT RLS-protected (service-layer authorization +
+//     least-privilege grants); its CREATE/UPDATE/DELETE surface is the only
+//     path and `plan_tier` is DB-defaulted and unwritable by the app role.
+//   - Auth.js adapter models keep the exact field names @auth/prisma-adapter
+//     reads (`userId`, `providerAccountId`, `sessionToken`, `refresh_token`, …)
+//     while physical columns are normalized to snake_case via @map/@@map.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ────────────────────────────────────────────────────────────────────
+
+enum PlanTier {
+  trial
+  pro
+  enterprise
+}
+
+enum MembershipRole {
+  owner
+  admin
+  member
+}
+
+enum MembershipStatus {
+  active
+  invited
+  deactivated
+}
+
+// ── Tenant root (no RLS; service-layer authorization + role grants) ──────────
+
+model Organization {
+  id            String    @id @default(cuid(2))
+  name          String
+  slug          String    @unique
+  planTier      PlanTier  @default(pro) @map("plan_tier")
+  quotaCurrency String    @map("quota_currency")
+  featureFlags  Json      @default("{}") @map("feature_flags")
+  settings      Json      @default("{}")
+  memberships   Membership[]
+  invites       Invite[]
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("organization")
+}
+
+// ── Identity (global, not tenant-scoped; no RLS) ─────────────────────────────
+
+model User {
+  id             String       @id @default(cuid(2))
+  name           String?
+  email          String       @unique
+  emailVerified  DateTime?    @map("email_verified")
+  image          String?
+  passwordHash   String?      @map("password_hash")
+  timezone       String       @default("UTC")
+  locale         String       @default("en")
+  onboardedAt    DateTime?    @map("onboarded_at")
+  memberships    Membership[]
+  invitesCreated Invite[]     @relation("InviteCreator")
+  accounts       Account[]
+  sessions       Session[]
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@map("user")
+}
+
+// ── Tenant-scoped: user ↔ org (RLS backstop) ─────────────────────────────────
+
+model Membership {
+  id             String           @id @default(cuid(2))
+  organizationId String           @map("organization_id")
+  userId         String           @map("user_id")
+  role           MembershipRole
+  status         MembershipStatus @default(active)
+  joinedAt       DateTime?        @map("joined_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@index([status])
+  @@map("membership")
+}
+
+// ── Tenant-scoped: new-member invitation (RLS backstop) ──────────────────────
+
+model Invite {
+  id             String         @id @default(cuid(2))
+  organizationId String         @map("organization_id")
+  email          String
+  role           MembershipRole
+  createdById    String         @map("created_by")
+  expiresAt      DateTime       @map("expires_at")
+  acceptedAt     DateTime?      @map("accepted_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation("InviteCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([createdById])
+  @@map("invite")
+}
+
+// ── Auth.js adapter models ───────────────────────────────────────────────────
+// Prisma field names are fixed by @auth/prisma-adapter (2.11.3); the @map/@@map
+// only change PHYSICAL names to snake_case, never the generated client's
+// property/delegate names.
+
+model Account {
+  id                String  @id @default(cuid(2))
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("account")
+}
+
+model Session {
+  id           String   @id @default(cuid(2))
+  sessionToken String   @map("session_token") @unique
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_token")
+}

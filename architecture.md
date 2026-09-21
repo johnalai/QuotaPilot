@@ -159,11 +159,54 @@ Defense-in-depth with two independent layers. Each layer alone must be enough to
 
 ### 7.2 Layer 2 — Postgres RLS (backstop)
 
-- RLS is **on for all tenant tables**, policy: `USING (organization_id = (current_setting('request.jwt.claims', true)::jsonb ->> 'org_id'))`.
-- The application connects to Supabase Postgres as a **non-superuser app role** that is subject to RLS. Supabase `postgres`/`service_role` is used only for migrations and system operations, never by the app runtime.
-- Per HTTP request, the service layer opens an interactive transaction and sets `select set_config('request.jwt.claims', '<signed org claim>', false)` (= transaction-local, safe with PgBouncer transaction pooling) before executing repository queries.
-- RLS therefore _catches_ any repository bug that forgets to filter: the row read returns empty and the write is blocked.
-- RLS integration mechanism (Prisma preview RLS adapter vs. `set_config` in interactive transaction) is fixed at implementation time (Phase 1); the architecture requires the session-claim contract regardless.
+**Mechanism (decided in Phase 1 from spike evidence in
+[docs/phase-1-slice-1.md](docs/phase-1-slice-1.md)):** transaction-scoped
+`set_config('request.jwt.claims', …, true)` inside a Prisma interactive
+transaction. Session-scoped claims are **rejected** (§7.2 evidence below).
+
+- **Policy (null-safe).** RLS is **on for all tenant tables**; the predicate is
+  the null-safe form, not a naive `::jsonb` cast:
+  ```sql
+  USING     (organization_id = NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'org_id')
+  WITH CHECK (organization_id = NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'org_id')
+  ```
+  The `NULLIF(..., '')` guard is **mandatory**: once the placeholder GUC has
+  been `SET` anywhere on the server, a reused pooled connection can read `''`
+  (placeholder default), and the naive form then throws `22P02 invalid input
+  syntax for type json` — a loud crash mid-request — instead of failing closed.
+  Both NULL (fresh connection) and `''` must mean "no claim". Observed during
+  the Phase 1 spike.
+- **Fail closed.** When the claim is missing, empty, malformed, or its `org_id`
+  does not match the row, the predicate is NULL/false → reads return 0 rows,
+  writes are blocked. RLS therefore catches any repository bug that forgets to
+  filter. **Defense-in-depth must fail quiet, not fail loud.**
+- **Claim setting (per HTTP request).** The service layer opens a **Prisma
+  interactive transaction** and executes `select set_config('request.jwt.claims',
+  '<json claim>', true)` — the third argument `true` is **transaction-local**,
+  equivalent to `SET LOCAL` — *before* any tenant-scoped repository query.
+- **Transaction-bound client.** Every tenant-scoped repository operation in that
+  request must use the **transaction-bound Prisma client** (`tx`), **never the
+  root/global Prisma client**, so the claim is always present on the exact
+  connection that runs the query. Reading through the root client bypasses the
+  claim boundary.
+- **Never session-scoped.** `set_config(..., false)` / `SET` (session-scoped)
+  must **never** be used for organization context: under any connection pool the
+  session state survives and leaks into later requests on a reused connection.
+  Evidence (spike, documented in `docs/phase-1-slice-1.md` §6): (1) the
+  reconnect probe — a session claim SET on one connection is invisible on a
+  freshly-opened one (NULL or `''`; reads blocked, 0 rows), so session claims
+  are non-deterministic per request; (2) the `?connection_limit=1` Prisma demo —
+  a session-scoped claim persists on the same connection and the **next
+  statement sees the previous org's rows**, a leak under real pooling.
+- **Roles.** The app runtime connects as a dedicated **non-superuser application
+  role that is subject to RLS and has `NOVBYPASSRLS`** (`rolbypassrls = f`; no
+  isolation claim may rest on a `BYPASSRLS` role). A separate **owner/migration
+  role** (Supabase `postgres`/`service_role`) performs schema setup and
+  migrations only — never app runtime queries.
+- **Pooling.** Transaction-local state is compatible with PgBouncer
+  **transaction** pooling (discarded per transaction, so the claim never leaks);
+  statement-only pooling would break Prisma interactive transactions. Supabase's
+  transaction pooler is the production target.
 
 ### 7.3 Cross-tenant guarantees baked into tests (N1/N4)
 

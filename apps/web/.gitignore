@@ -32,6 +32,13 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# Phase 1 RLS spike scratch (throwaway — strip before the Phase 1 milestone).
+# Conclusions are recorded in docs/phase-1-slice-1.md; setup/check/cleanup SQL
+# keeps them reproducible. Deleting the folder + rerunning rls-scratch-cleanup.sql
+# is the planned cleanup.
+src/lib/db/spikes/
 
 # vercel
 .vercel

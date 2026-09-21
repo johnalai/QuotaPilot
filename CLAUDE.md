@@ -26,6 +26,7 @@ A multi-tenant SaaS (QuotaPilot) for technical sellers: ramp-up, quota understan
 2. **Tenancy — never optional:**
    - Every tenant-scoped table carries `organization_id`; the repository receives a `TenantContext` and injects the org filter into **every** query. No tenant-scoped-lookup-without-org method. Ever.
    - Tenancy is **defense-in-depth**: app-layer scoping (primary) + Postgres **RLS** backstop reading `request.jwt.claims` (set per request). The app runtime connects as a non-superuser **app role** subject to RLS; `postgres`/service-role is for migrations/system ops only.
+   - **RLS claims are transaction-scoped, never session-scoped.** Per HTTP request, set `select set_config('request.jwt.claims', '<json claim>', true)` (≈ `SET LOCAL`) inside the same Prisma interactive transaction that performs all tenant-scoped queries, and run those queries only through the **transaction-bound** Prisma client — never the root client, never `set_config(..., false)`. Session-scoped claims leak across pooled connections and are rejected (evidence in architecture §7.2 and docs/phase-1-slice-1.md).
    - **The client never supplies the org id.** Org comes from the session (`TenantContext`).
 3. **Financial integrity:** money = integer minor units + ISO currency; weighted values and risk scores are **computed**, never user-entered; **AI output never writes financial fields** — AI proposes, the user commits.
 4. **Validation:** zod schemas in `packages/contracts` are the single source of truth used by forms, Server Actions, and Route Handlers.
@@ -61,7 +62,7 @@ A multi-tenant SaaS (QuotaPilot) for technical sellers: ramp-up, quota understan
 ## 7. Working here
 
 - Small green steps, Phase 1 isolation gate before feature work (see implementation-plan).
-- Prisma→RLS session-claim spike decision (Phase 1) should be recorded back into architecture §7.2 before Phase 2.
+- The Prisma→RLS session-claim decision (transaction-scoped `set_config(..., true)` in an interactive transaction) is recorded in architecture §7.2, from the Phase 1 spike evidence in docs/phase-1-slice-1.md.
 - When in doubt, ask: "does this read/write stay inside the org from the session?" If yes-and-clear, proceed; else ask the architect.
 
 ## 8. Attribution
