@@ -1,13 +1,13 @@
 {
   "enabledPlugins": {
-    "superpowers@superpowers-marketplace": true,
     "superpowers@claude-plugins-official": true,
     "security-guidance@claude-plugins-official": true,
     "code-review@claude-plugins-official": true,
-    "skill-creator@claude-plugins-official": true,
     "remember@claude-plugins-official": true,
     "voltagent-core-dev@voltagent-subagents": true,
-    "voltagent-lang@voltagent-subagents": true,
-    "voltagent-qa-sec@voltagent-subagents": true
+    "voltagent-qa-sec@voltagent-subagents": true,
+    "superpowers@superpowers-marketplace": false,
+    "voltagent-lang@voltagent-subagents": false,
+    "skill-creator@claude-plugins-official": false
   }
 }

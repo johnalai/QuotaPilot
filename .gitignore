@@ -15,6 +15,9 @@ coverage/
 .env.*
 !.env.example
 
+# Cookie jars — exported session state, never commit
+cookies.txt
+
 # Local Postgres / Docker
 *.local
 pgdata/
@@ -24,6 +27,7 @@ pgdata/
 .claude/settings.local.json
 .DS_Store
 Thumbs.db
+*.lnk
 
 # Logs
 *.log
