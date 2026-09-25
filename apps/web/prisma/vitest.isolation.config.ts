@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+
 import { defineConfig } from 'vitest/config';
 
 /**
@@ -16,6 +18,14 @@ import { defineConfig } from 'vitest/config';
  * MIGRATION_DATABASE_URL (owner role) explicitly and never trust DATABASE_URL.
  */
 export default defineConfig({
+  resolve: {
+    // The suites import the real services, which use the app's `@/` path alias.
+    // The app resolves that via tsconfig; vitest needs it declared explicitly,
+    // otherwise a service-level live test fails to resolve its own imports.
+    alias: {
+      '@': fileURLToPath(new URL('../src', import.meta.url)),
+    },
+  },
   test: {
     include: ['src/lib/db/live/**/*.test.ts'],
     environment: 'node',
