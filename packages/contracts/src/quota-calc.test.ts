@@ -26,7 +26,9 @@ describe('quotaCalcInputSchema', () => {
   });
 
   it('rejects non-integer money', () => {
-    expect(quotaCalcInputSchema.safeParse({ ...validInput, quotaAmount: 25_000.5 }).success).toBe(false);
+    expect(quotaCalcInputSchema.safeParse({ ...validInput, quotaAmount: 25_000.5 }).success).toBe(
+      false,
+    );
   });
 
   it('rejects zero and >1 conversion rates, accepts 1', () => {
@@ -44,9 +46,9 @@ describe('quotaCalcInputSchema', () => {
   });
 
   it('rejects NaN and non-finite rates', () => {
-    expect(
-      quotaCalcInputSchema.safeParse({ ...validInput, winRate: Number.NaN }).success,
-    ).toBe(false);
+    expect(quotaCalcInputSchema.safeParse({ ...validInput, winRate: Number.NaN }).success).toBe(
+      false,
+    );
     expect(
       quotaCalcInputSchema.safeParse({ ...validInput, winRate: Number.POSITIVE_INFINITY }).success,
     ).toBe(false);
@@ -56,14 +58,24 @@ describe('quotaCalcInputSchema', () => {
   });
 
   it('rejects non-positive pipeline coverage targets', () => {
-    expect(quotaCalcInputSchema.safeParse({ ...validInput, pipelineCoverageTarget: 0 }).success).toBe(false);
-    expect(quotaCalcInputSchema.safeParse({ ...validInput, pipelineCoverageTarget: -1 }).success).toBe(false);
+    expect(
+      quotaCalcInputSchema.safeParse({ ...validInput, pipelineCoverageTarget: 0 }).success,
+    ).toBe(false);
+    expect(
+      quotaCalcInputSchema.safeParse({ ...validInput, pipelineCoverageTarget: -1 }).success,
+    ).toBe(false);
   });
 
   it('rejects invalid sales-cycle lengths', () => {
-    expect(quotaCalcInputSchema.safeParse({ ...validInput, salesCycleMonths: 0 }).success).toBe(false);
-    expect(quotaCalcInputSchema.safeParse({ ...validInput, salesCycleMonths: -3 }).success).toBe(false);
-    expect(quotaCalcInputSchema.safeParse({ ...validInput, salesCycleMonths: 2.5 }).success).toBe(false);
+    expect(quotaCalcInputSchema.safeParse({ ...validInput, salesCycleMonths: 0 }).success).toBe(
+      false,
+    );
+    expect(quotaCalcInputSchema.safeParse({ ...validInput, salesCycleMonths: -3 }).success).toBe(
+      false,
+    );
+    expect(quotaCalcInputSchema.safeParse({ ...validInput, salesCycleMonths: 2.5 }).success).toBe(
+      false,
+    );
   });
 
   it('rejects malformed currency codes', () => {

@@ -17,9 +17,7 @@ import { getSessionProjection } from '@/lib/auth/session';
  * Must run on Node.js runtime because it uses argon2 (node:crypto) via auth.
  */
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|api/health|api/auth).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/health|api/auth).*)'],
 };
 
 export const runtime = 'nodejs';

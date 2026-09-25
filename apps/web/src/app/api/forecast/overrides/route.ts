@@ -3,8 +3,7 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-import { getServerSession } from '@/lib/auth';
-import { getSessionProjection } from '@/lib/auth/session';
+import { getSessionServer } from '@/lib/auth/session';
 import { prisma } from '@/lib/db/client';
 import { withTenant } from '@/lib/db/tenancy/tenant-ctx';
 
@@ -17,43 +16,36 @@ import { withTenant } from '@/lib/db/tenancy/tenant-ctx';
  * Returns the forecast overrides for the organization.
  */
 export async function GET(request: NextRequest) {
-  const session = await getServerSession();
-  const projection = await getSessionProjection();
+  // `getSessionServer()` returns a TenantContext (org + role) from the session,
+  // or null. The previous `getServerSession()` was never exported by `@/lib/auth`.
+  const ctx = await getSessionServer();
 
-  if (!session || !projection.authenticated || !projection.organizationId) {
+  if (!ctx) {
     return NextResponse.json(
       { ok: false, error: { code: 'FORBIDDEN', message: 'Unauthenticated' } },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
-  const ctx = {
-    organizationId: projection.organizationId,
-    userId: projection.userId,
-  };
-
   // Ensure the tenant context is set for the Prisma transaction
-  const forecastOverrides = await withTenant(
-    ctx,
-    async (tx) => {
-      const overrides = await tx.forecastOverride.findMany({
-        where: { organizationId: ctx.organizationId },
-        orderBy: { month: 'asc' },
-      });
+  const forecastOverrides = await withTenant(ctx, async (tx) => {
+    const overrides = await tx.forecastOverride.findMany({
+      where: { organizationId: ctx.organizationId },
+      orderBy: { month: 'asc' },
+    });
 
-      // Convert to the format expected by the frontend
-      return overrides.map(override => ({
-        id: override.id,
-        organizationId: override.organizationId,
-        month: override.month,
-        committed: override.committed,
-        bestCase: override.bestCase,
-        pipeline: override.pipeline,
-        createdAt: override.createdAt,
-        updatedAt: override.updatedAt,
-      }));
-    }
-  );
+    // Convert to the format expected by the frontend
+    return overrides.map((override) => ({
+      id: override.id,
+      organizationId: override.organizationId,
+      month: override.month,
+      committed: override.committed,
+      bestCase: override.bestCase,
+      pipeline: override.pipeline,
+      createdAt: override.createdAt,
+      updatedAt: override.updatedAt,
+    }));
+  });
 
   return NextResponse.json({ ok: true, data: forecastOverrides });
 }

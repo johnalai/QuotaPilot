@@ -25,7 +25,9 @@ import type { Organization, User } from '@prisma/client';
 const OWNER_URL = process.env.MIGRATION_DATABASE_URL;
 
 if (!OWNER_URL) {
-  throw new Error('referential-integrity suite needs MIGRATION_DATABASE_URL (owner). Run via test:isolation.');
+  throw new Error(
+    'referential-integrity suite needs MIGRATION_DATABASE_URL (owner). Run via test:isolation.',
+  );
 }
 
 let owner: PrismaClient | null = null;
@@ -67,10 +69,16 @@ beforeAll(async () => {
 afterAll(async () => {
   const o = ownerRole();
   try {
-    await o.invite.deleteMany({ where: { organizationId: { in: [orgA?.id ?? '', plainOrg?.id ?? ''] } } });
-    await o.membership.deleteMany({ where: { organizationId: { in: [orgA?.id ?? '', plainOrg?.id ?? ''] } } });
+    await o.invite.deleteMany({
+      where: { organizationId: { in: [orgA?.id ?? '', plainOrg?.id ?? ''] } },
+    });
+    await o.membership.deleteMany({
+      where: { organizationId: { in: [orgA?.id ?? '', plainOrg?.id ?? ''] } },
+    });
     await o.user.deleteMany({ where: { id: { in: [inviter?.id ?? '', plainUser?.id ?? ''] } } });
-    await o.organization.deleteMany({ where: { id: { in: [orgA?.id ?? '', plainOrg?.id ?? ''] } } });
+    await o.organization.deleteMany({
+      where: { id: { in: [orgA?.id ?? '', plainOrg?.id ?? ''] } },
+    });
   } finally {
     await owner?.$disconnect();
   }
@@ -79,7 +87,9 @@ afterAll(async () => {
 describe('deleting a user who created an invite is blocked (Invite.createdBy RESTRICT)', () => {
   it('user.delete fails with a foreign-key error (P2003)', async () => {
     const o = ownerRole();
-    await expect(o.user.delete({ where: { id: inviter!.id } })).rejects.toMatchObject({ code: 'P2003' });
+    await expect(o.user.delete({ where: { id: inviter!.id } })).rejects.toMatchObject({
+      code: 'P2003',
+    });
     // Row is still there.
     const stillThere = await o.user.findUnique({ where: { id: inviter!.id } });
     expect(stillThere).not.toBeNull();
@@ -111,7 +121,11 @@ describe('deleting a user cascades its tenant + adapter links (CASCADE FKs)', ()
       },
     });
     await o.session.create({
-      data: { sessionToken: `ri-sess-${Date.now()}`, userId: plainUser!.id, expires: new Date(Date.now() + 86_400_000) },
+      data: {
+        sessionToken: `ri-sess-${Date.now()}`,
+        userId: plainUser!.id,
+        expires: new Date(Date.now() + 86_400_000),
+      },
     });
 
     await o.user.delete({ where: { id: plainUser!.id } });

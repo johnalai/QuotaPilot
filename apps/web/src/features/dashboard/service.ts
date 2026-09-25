@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { authorize } from '@/lib/permissions/abilities';
+import { forbidden } from '@/lib/errors';
 import type { TenantContext } from '@/lib/db/client';
 import { CatalogRepo, type DealRow } from '@/lib/db/tenancy/catalog';
 import { QuotaPlanRepo } from '@/lib/db/tenancy/quotaplan';
@@ -38,7 +39,9 @@ export interface DashboardData {
  * seller-entered figure, and no financial field is written by AI.
  */
 export async function getDashboardData(ctx: TenantContext): Promise<DashboardData> {
-  authorize(ctx, 'view');
+  if (!authorize(ctx, 'view')) {
+    throw forbidden('You do not have permission to view this organization');
+  }
 
   const repos = {
     catalog: new CatalogRepo(prisma),
@@ -64,22 +67,22 @@ export async function getDashboardData(ctx: TenantContext): Promise<DashboardDat
     ownerId: d.ownerId,
   });
 
-  const openDeals = deals
-    .filter((d) => d.stage !== 'won' && d.stage !== 'lost')
-    .map(toOpportunity);
+  const openDeals = deals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').map(toOpportunity);
   const pipelineTotal = totalPipeline(openDeals);
   const weightedTotal = totalWeightedForecast(openDeals);
 
   const forecast = buildForecast(openDeals);
 
   const topDeals = plan
-    ? rankOpportunities(openDeals, toQuotaPlan(plan)).slice(0, 5).map((r) => ({
-        id: r.opportunity.id,
-        name: r.opportunity.name,
-        stage: r.opportunity.stage,
-        amount: r.opportunity.amount,
-        score: Math.round(r.score),
-      }))
+    ? rankOpportunities(openDeals, toQuotaPlan(plan))
+        .slice(0, 5)
+        .map((r) => ({
+          id: r.opportunity.id,
+          name: r.opportunity.name,
+          stage: r.opportunity.stage,
+          amount: r.opportunity.amount,
+          score: Math.round(r.score),
+        }))
     : [];
 
   const riskCount = { low: 0, medium: 0, high: 0, critical: 0 };

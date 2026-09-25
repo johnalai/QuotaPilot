@@ -51,7 +51,9 @@ export const { handlers, auth } = NextAuth({
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials): Promise<ExtendedUser | null> {
-        const email = String(credentials?.email ?? '').toLowerCase().trim();
+        const email = String(credentials?.email ?? '')
+          .toLowerCase()
+          .trim();
         const password = String(credentials?.password ?? '');
         if (!email || !password) return null;
 

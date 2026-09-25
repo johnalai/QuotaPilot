@@ -16,17 +16,17 @@ or UI. No feature code ships in this slice.
 
 ## 1. Approved design (recorded in the Phase 1 Slice 2 approval)
 
-| Decision | Value |
-| --- | --- |
-| Physical table names | lowercase snake_case (`organization`, `user`, `membership`, `invite`, `account`, `session`, `verification_token`) |
-| Physical column names | lowercase snake_case (`organization_id`, `provider_account_id`, …) |
-| Prisma field names | camelCase, kept exact for the Auth.js adapter contract (`sessionToken`, `providerAccountId`, `refresh_token`, …) |
-| `Invite.createdById` | required, `ON DELETE RESTRICT` |
-| `Invite.organization` | `ON DELETE CASCADE` |
-| `organization` grants | narrow; **no DELETE / TRUNCATE / REFERENCES** |
-| `membership` / `invite` RLS | org-claim policies enabled |
-| Enum type names | mixed-case (`"PlanTier"`, `"MembershipRole"`, `"MembershipStatus"`) — approved for this migration |
-| Suites in this slice | cross-tenant isolation **release gate** + referential-integrity (both against the local dev DB) |
+| Decision                    | Value                                                                                                             |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Physical table names        | lowercase snake_case (`organization`, `user`, `membership`, `invite`, `account`, `session`, `verification_token`) |
+| Physical column names       | lowercase snake_case (`organization_id`, `provider_account_id`, …)                                                |
+| Prisma field names          | camelCase, kept exact for the Auth.js adapter contract (`sessionToken`, `providerAccountId`, `refresh_token`, …)  |
+| `Invite.createdById`        | required, `ON DELETE RESTRICT`                                                                                    |
+| `Invite.organization`       | `ON DELETE CASCADE`                                                                                               |
+| `organization` grants       | narrow; **no DELETE / TRUNCATE / REFERENCES**                                                                     |
+| `membership` / `invite` RLS | org-claim policies enabled                                                                                        |
+| Enum type names             | mixed-case (`"PlanTier"`, `"MembershipRole"`, `"MembershipStatus"`) — approved for this migration                 |
+| Suites in this slice        | cross-tenant isolation **release gate** + referential-integrity (both against the local dev DB)                   |
 
 ## 2. Roles and credential separation
 
@@ -37,17 +37,17 @@ or UI. No feature code ships in this slice.
 - **App (RLS-subject) role:** `quotapilot_app`, bootstrapped from
   `apps/web/prisma/bootstrap-app-role.sql`:
   `LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT`
-  + `GRANT CONNECT ON DATABASE quotapilot`.
+  - `GRANT CONNECT ON DATABASE quotapilot`.
 
 Verified role attributes (post-bootstrap, live DB):
 
-| Check | Result |
-| --- | --- |
-| `rolbypassrls = f` | ✅ |
-| not superuser / no CREATEROLE / no CREATEDB | ✅ |
-| owns **0** objects (owns no application tables) | ✅ |
-| **no** `CREATE` on schema `public` (USAGE only) | ✅ |
-| no role memberships → no inherited privileges | ✅ |
+| Check                                           | Result |
+| ----------------------------------------------- | ------ |
+| `rolbypassrls = f`                              | ✅     |
+| not superuser / no CREATEROLE / no CREATEDB     | ✅     |
+| owns **0** objects (owns no application tables) | ✅     |
+| **no** `CREATE` on schema `public` (USAGE only) | ✅     |
+| no role memberships → no inherited privileges   | ✅     |
 
 - Migration/owner credentials live in **`.env.migration`** (gitignored:
   `DATABASE_URL` = `MIGRATION_DATABASE_URL` = owner URL).
@@ -79,13 +79,13 @@ ALTER DEFAULT PRIVILEGES FOR ROLE quotapilot IN SCHEMA public
 
 Tables (`applied` from the reported DDL — see §7 for evidence):
 
-| Table | Tenant-scoped? | RLS | Notes |
-| --- | --- | --- | --- |
-| `organization` | root | **no** | narrow grants, no DELETE (Slice 2 Adjustment 1) |
-| `user` | no | **no** | identity; no org-claim policy |
-| `membership` | yes | **yes** | `(organization_id, user_id)` unique |
-| `invite` | yes | **yes** | `created_by` RESTRICT, `organization` CASCADE |
-| `account` / `session` / `verification_token` | no | **no** | Auth.js adapter contract |
+| Table                                        | Tenant-scoped? | RLS     | Notes                                           |
+| -------------------------------------------- | -------------- | ------- | ----------------------------------------------- |
+| `organization`                               | root           | **no**  | narrow grants, no DELETE (Slice 2 Adjustment 1) |
+| `user`                                       | no             | **no**  | identity; no org-claim policy                   |
+| `membership`                                 | yes            | **yes** | `(organization_id, user_id)` unique             |
+| `invite`                                     | yes            | **yes** | `created_by` RESTRICT, `organization` CASCADE   |
+| `account` / `session` / `verification_token` | no             | **no**  | Auth.js adapter contract                        |
 
 Key constraints: `membership.organization_id`/`user_id` CASCADE; `invite.organization_id`
 CASCADE; `invite.created_by` RESTRICT; `account.user_id` / `session.user_id` CASCADE;
@@ -136,7 +136,7 @@ backed by least-privilege grants.
   boundary (member of org_B hitting org_A fails closed), inactive/owner/admin
   matrix.
 - **Live DB (excluded from `pnpm test`, run via `pnpm --filter @quotapilot/web
-  test:isolation`):**
+test:isolation`):**
   - `src/lib/db/live/isolation.test.ts` — the **cross-tenant RLS release gate**.
     Every positive isolation assertion is produced by the NOBYPASSRLS app role,
     never the owner (whose RLS bypass would fake a pass). Covers: app-role
@@ -171,28 +171,28 @@ in the fixture seed, not in the schema):
   omitted it → `23502`. Fixed by supplying `updated_at = NOW()`.
 - The fixture initially created **two memberships for one user in org_A** — but
   the unique index `(organization_id, user_id)` (correctly) allows one per
-  (org, user). Fixed by giving the org_A *member* membership to a second seed
+  (org, user). Fixed by giving the org_A _member_ membership to a second seed
   user, keeping the two-rows-per-org expectation. Vitest's `afterAll` runs even
   when `beforeAll` throws, so no fixture ever leaked between runs (verified: 0
   orphaned `iso-*` rows after each failure).
 
 ## 8. Test evidence
 
-| Check | Path | Result |
-| --- | --- | --- |
-| `quotapilot_app` identity: `rolbypassrls = f`, not superuser | isolation suite | ✅ 2/2 |
-| app role owns 0 application tables | isolation suite | ✅ |
-| no claim → reads **0** rows (fails closed) | isolation suite | ✅ |
-| claim org_A → only org_A memberships visible | isolation suite | ✅ |
-| claim org_A → INSERT org_B row rejected (`WITH CHECK`) | isolation suite | ✅ |
-| claim org_A → UPDATE/DELETE org_B → 0 rows | isolation suite | ✅ |
-| claim org_B (positive control) → only org_B rows | isolation suite | ✅ |
-| claim inert after transaction (no cross-connection leak) | isolation suite | ✅ |
-| deleting an invite-creating user → P2003 (RESTRICT) | referential-integrity | ✅ |
-| deleting an organization cascades its invites | referential-integrity | ✅ |
-| deleting a user cascades memberships/accounts/sessions | referential-integrity | ✅ |
-| unrelated-org authz fails closed (unit) | `pnpm test` | ✅ 7/7 |
-| lint / typecheck / full unit suite | repo root | ✅ lint · typecheck · **38/38** |
+| Check                                                        | Path                  | Result                          |
+| ------------------------------------------------------------ | --------------------- | ------------------------------- |
+| `quotapilot_app` identity: `rolbypassrls = f`, not superuser | isolation suite       | ✅ 2/2                          |
+| app role owns 0 application tables                           | isolation suite       | ✅                              |
+| no claim → reads **0** rows (fails closed)                   | isolation suite       | ✅                              |
+| claim org_A → only org_A memberships visible                 | isolation suite       | ✅                              |
+| claim org_A → INSERT org_B row rejected (`WITH CHECK`)       | isolation suite       | ✅                              |
+| claim org_A → UPDATE/DELETE org_B → 0 rows                   | isolation suite       | ✅                              |
+| claim org_B (positive control) → only org_B rows             | isolation suite       | ✅                              |
+| claim inert after transaction (no cross-connection leak)     | isolation suite       | ✅                              |
+| deleting an invite-creating user → P2003 (RESTRICT)          | referential-integrity | ✅                              |
+| deleting an organization cascades its invites                | referential-integrity | ✅                              |
+| deleting a user cascades memberships/accounts/sessions       | referential-integrity | ✅                              |
+| unrelated-org authz fails closed (unit)                      | `pnpm test`           | ✅ 7/7                          |
+| lint / typecheck / full unit suite                           | repo root             | ✅ lint · typecheck · **38/38** |
 
 > Evidence note: rows 1–11 (live-DB isolation + referential integrity) are from the
 > recorded Slice 2 run (§7). They were **not** re-executed during this cleanup — the

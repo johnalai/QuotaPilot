@@ -16,12 +16,7 @@ import 'server-only';
  *   RATE_LIMITED    — too many requests (Phase 6)
  */
 export type ErrorCode =
-  | 'VALIDATION'
-  | 'FORBIDDEN'
-  | 'NOT_FOUND'
-  | 'TENANT_VIOLATION'
-  | 'AI_QUOTA'
-  | 'RATE_LIMITED';
+  'VALIDATION' | 'FORBIDDEN' | 'NOT_FOUND' | 'TENANT_VIOLATION' | 'AI_QUOTA' | 'RATE_LIMITED';
 
 export interface ApiErrorShape {
   ok: false;

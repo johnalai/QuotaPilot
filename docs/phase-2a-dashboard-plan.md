@@ -2,7 +2,8 @@
 
 **Status:** Approved for implementation · **Date:** 2026-09-21
 **Scope:** the smallest coherent slice that makes the dashboard real: auth flows
-+ domain CRUD + rule engine + seed data + wired dashboard cards.
+
+- domain CRUD + rule engine + seed data + wired dashboard cards.
 
 ## 1. Goal
 
@@ -12,15 +13,15 @@ not placeholders. Everything behind it (auth, tenancy, RLS, rules) is in place.
 
 ## 2. What this slice includes
 
-| Layer | Delivered |
-| --- | --- |
-| Auth | Credentials login/register (Auth.js v5), `middleware.ts` session→tenant gating, `/api/session` projection, onboarding redirect |
-| Schema | `QuotaPlan`, `Account`, `Opportunity`, `ForecastLine`, `RiskSignal`, `ActionTask` — each `organization_id`-scoped + RLS policy + isolation test |
+| Layer        | Delivered                                                                                                                                              |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Auth         | Credentials login/register (Auth.js v5), `middleware.ts` session→tenant gating, `/api/session` projection, onboarding redirect                         |
+| Schema       | `QuotaPlan`, `Account`, `Opportunity`, `ForecastLine`, `RiskSignal`, `ActionTask` — each `organization_id`-scoped + RLS policy + isolation test        |
 | Repositories | org-scoped DAL (`quota`, `account`, `opportunity`, `forecast`, `risk`, `action`) with transaction-bound `set_config('request.jwt.claims')` claim setup |
-| Rules | `priority.ts`, `forecast.ts`, `risk.ts`, `plan.ts` — pure, unit-tested in `packages/domain` |
-| Contracts | zod schemas in `packages/contracts` for every entity + form input |
-| Seed | `db:seed` — demo org with 1 owner, 6 accounts, 12 opportunities, 3 forecast lines, 12 action tasks, 5 objections |
-| UI | wired dashboard cards + `actions` page; login/register forms functional |
+| Rules        | `priority.ts`, `forecast.ts`, `risk.ts`, `plan.ts` — pure, unit-tested in `packages/domain`                                                            |
+| Contracts    | zod schemas in `packages/contracts` for every entity + form input                                                                                      |
+| Seed         | `db:seed` — demo org with 1 owner, 6 accounts, 12 opportunities, 3 forecast lines, 12 action tasks, 5 objections                                       |
+| UI           | wired dashboard cards + `actions` page; login/register forms functional                                                                                |
 
 ## 3. Explicitly out of scope
 

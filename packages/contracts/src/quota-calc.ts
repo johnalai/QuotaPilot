@@ -33,10 +33,7 @@ export const rateSchema = z
   .lte(1, 'a conversion rate cannot exceed 1');
 
 /** Pipeline coverage is a positive multiple of the quota (typically ≥ 1). */
-export const coverageSchema = z
-  .number()
-  .finite()
-  .gt(0, 'pipeline coverage must be greater than 0');
+export const coverageSchema = z.number().finite().gt(0, 'pipeline coverage must be greater than 0');
 
 export const quotaCalcInputSchema = z
   .object({

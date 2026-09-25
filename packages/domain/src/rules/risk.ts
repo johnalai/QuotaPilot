@@ -112,7 +112,7 @@ export function assessRisk(input: RiskInput): RiskSignal[] {
         opportunityId: null,
         kind: 'single_customer_concentration',
         severity: value / weightedPipeline > 0.7 ? 'critical' : 'high',
-        message: `Account ${accountId} holds ${(value / weightedPipeline * 100).toFixed(0)}% of weighted pipeline — a single-customer dependency.`,
+        message: `Account ${accountId} holds ${((value / weightedPipeline) * 100).toFixed(0)}% of weighted pipeline — a single-customer dependency.`,
       });
     }
   }

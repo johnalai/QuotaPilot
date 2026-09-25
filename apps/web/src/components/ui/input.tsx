@@ -9,11 +9,7 @@ import { cn } from 'cn';
  * handful of form primitives and this keeps the bundle small. Accessibility
  * is via native semantics + the label association below.
  */
-function Input({
-  className,
-  type = 'text',
-  ...props
-}: React.ComponentPropsWithoutRef<'input'>) {
+function Input({ className, type = 'text', ...props }: React.ComponentPropsWithoutRef<'input'>) {
   return (
     <input
       type={type}

@@ -62,13 +62,7 @@ export const riskSignalKindSchema = z.enum([
 export type RiskSignalKind = z.output<typeof riskSignalKindSchema>;
 
 /** Action-task kinds — what the daily plan can schedule. */
-export const actionTaskKindSchema = z.enum([
-  'call',
-  'demo',
-  'prep',
-  'review',
-  'outreach',
-]);
+export const actionTaskKindSchema = z.enum(['call', 'demo', 'prep', 'review', 'outreach']);
 export type ActionTaskKind = z.output<typeof actionTaskKindSchema>;
 
 export const actionTaskStatusSchema = z.enum(['open', 'done', 'dismissed']);

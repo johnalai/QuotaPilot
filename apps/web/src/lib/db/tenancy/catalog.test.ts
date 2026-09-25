@@ -1,12 +1,17 @@
-import { describe, expect, test, beforeEach, afterEach, vi } from 'vitest';
+import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import { CatalogRepo } from './catalog';
 
-// Mock server-only to prevent errors in test environment
-vi.mock('server-only', () => {});
+// Mock server-only to prevent errors in test environment.
+// The factory must RETURN the module shape — `() => {}` returns void, which
+// does not satisfy vitest's MockFactory type.
+vi.mock('server-only', () => ({}));
 
-// Mock withTenant
-const mockWithTenant = vi.fn();
+// Mock withTenant.
+// `vi.mock` factories are hoisted above every top-level declaration, so the mock
+// must be created with `vi.hoisted` — referencing a plain top-level `const` in
+// the factory throws "Cannot access '...' before initialization" at collect time.
+const { mockWithTenant } = vi.hoisted(() => ({ mockWithTenant: vi.fn() }));
 vi.mock('./tenant-ctx', () => ({
   withTenant: mockWithTenant,
 }));
@@ -49,14 +54,40 @@ describe('CatalogRepo - Tenancy Isolation', () => {
   const testCtx = { organizationId: testOrgId };
 
   beforeEach(() => {
-    repo = new CatalogRepo(mockPrisma as unknown as PrismaClient);
     vi.clearAllMocks();
+    repo = new CatalogRepo(mockPrisma as unknown as PrismaClient);
+
+    // Give the mocked `withTenant` an implementation: invoke the callback with
+    // the fake prisma client so repository queries reach the mocks. Without
+    // this, every repo method resolves to `undefined`.
+    mockWithTenant.mockImplementation(async (_ctx: unknown, callback: unknown) => {
+      const run = callback as (tx: PrismaClient) => Promise<unknown>;
+      return run(mockPrisma as unknown as PrismaClient);
+    });
   });
 
   test('listCustomers filters by organizationId', async () => {
     const mockCustomers = [
-      { id: '1', organizationId: testOrgId, name: 'Customer 1', industry: null, segment: null, stage: 'new', createdAt: new Date(), updatedAt: new Date() },
-      { id: '2', organizationId: testOrgId, name: 'Customer 2', industry: null, segment: null, stage: 'active', createdAt: new Date(), updatedAt: new Date() },
+      {
+        id: '1',
+        organizationId: testOrgId,
+        name: 'Customer 1',
+        industry: null,
+        segment: null,
+        stage: 'new',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: '2',
+        organizationId: testOrgId,
+        name: 'Customer 2',
+        industry: null,
+        segment: null,
+        stage: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
     ];
 
     mockPrisma.customerAccount.findMany.mockResolvedValue(mockCustomers);
@@ -68,11 +99,20 @@ describe('CatalogRepo - Tenancy Isolation', () => {
       orderBy: { name: 'asc' },
     });
     expect(result).toHaveLength(2);
-    expect(result.every(c => c.organizationId === testOrgId)).toBe(true);
+    expect(result.every((c) => c.organizationId === testOrgId)).toBe(true);
   });
 
   test('getCustomer filters by organizationId', async () => {
-    const mockCustomer = { id: '1', organizationId: testOrgId, name: 'Customer 1', industry: null, segment: null, stage: 'new', createdAt: new Date(), updatedAt: new Date() };
+    const mockCustomer = {
+      id: '1',
+      organizationId: testOrgId,
+      name: 'Customer 1',
+      industry: null,
+      segment: null,
+      stage: 'new',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
 
     mockPrisma.customerAccount.findFirst.mockResolvedValue(mockCustomer);
 
@@ -86,8 +126,26 @@ describe('CatalogRepo - Tenancy Isolation', () => {
 
   test('listForecastOverrides filters by organizationId', async () => {
     const mockOverrides = [
-      { id: '1', organizationId: testOrgId, month: '2026-01', committed: 1000, bestCase: 2000, pipeline: 3000, createdAt: new Date(), updatedAt: new Date() },
-      { id: '2', organizationId: testOrgId, month: '2026-02', committed: 1500, bestCase: 2500, pipeline: 3500, createdAt: new Date(), updatedAt: new Date() },
+      {
+        id: '1',
+        organizationId: testOrgId,
+        month: '2026-01',
+        committed: 1000,
+        bestCase: 2000,
+        pipeline: 3000,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: '2',
+        organizationId: testOrgId,
+        month: '2026-02',
+        committed: 1500,
+        bestCase: 2500,
+        pipeline: 3500,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
     ];
 
     mockPrisma.forecastOverride.findMany.mockResolvedValue(mockOverrides);
@@ -99,11 +157,20 @@ describe('CatalogRepo - Tenancy Isolation', () => {
       orderBy: { month: 'asc' },
     });
     expect(result).toHaveLength(2);
-    expect(result.every(o => o.organizationId === testOrgId)).toBe(true);
+    expect(result.every((o) => o.organizationId === testOrgId)).toBe(true);
   });
 
   test('getForecastOverride filters by organizationId and month', async () => {
-    const mockOverride = { id: '1', organizationId: testOrgId, month: '2026-01', committed: 1000, bestCase: 2000, pipeline: 3000, createdAt: new Date(), updatedAt: new Date() };
+    const mockOverride = {
+      id: '1',
+      organizationId: testOrgId,
+      month: '2026-01',
+      committed: 1000,
+      bestCase: 2000,
+      pipeline: 3000,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
 
     mockPrisma.forecastOverride.findFirst.mockResolvedValue(mockOverride);
 
@@ -117,8 +184,23 @@ describe('CatalogRepo - Tenancy Isolation', () => {
   });
 
   test('upsertForecastOverride filters by organizationId', async () => {
-    const mockExisting = { id: '1', organizationId: testOrgId, month: '2026-01', committed: 1000, bestCase: 2000, pipeline: 3000, createdAt: new Date(), updatedAt: new Date() };
-    const mockUpdated = { ...mockExisting, committed: 2000, bestCase: 3000, pipeline: 4000, updatedAt: new Date() };
+    const mockExisting = {
+      id: '1',
+      organizationId: testOrgId,
+      month: '2026-01',
+      committed: 1000,
+      bestCase: 2000,
+      pipeline: 3000,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const mockUpdated = {
+      ...mockExisting,
+      committed: 2000,
+      bestCase: 3000,
+      pipeline: 4000,
+      updatedAt: new Date(),
+    };
 
     mockPrisma.forecastOverride.findFirst.mockResolvedValue(mockExisting);
     mockPrisma.forecastOverride.update.mockResolvedValue(mockUpdated);
@@ -145,15 +227,39 @@ describe('CatalogRepo - Tenancy Isolation', () => {
     expect(result.organizationId).toBe(testOrgId);
   });
 
-  // Cross-tenancy test: ensure queries don't leak data from other organizations
+  // Cross-tenancy test: the repository must scope every query to the caller's
+  // org. A mocked prisma client has no database to apply the WHERE clause, so it
+  // applies it here — this asserts the repo passes the org filter through. (The
+  // live suite under lib/db/live/ is what proves the DB-level RLS backstop.)
   test('does not return data from other organizations', async () => {
     const otherOrgId = 'other-org-id';
     const mockCustomers = [
-      { id: '1', organizationId: testOrgId, name: 'Customer 1', industry: null, segment: null, stage: 'new', createdAt: new Date(), updatedAt: new Date() },
-      { id: '2', organizationId: otherOrgId, name: 'Customer 2', industry: null, segment: null, stage: 'active', createdAt: new Date(), updatedAt: new Date() }, // Different org
+      {
+        id: '1',
+        organizationId: testOrgId,
+        name: 'Customer 1',
+        industry: null,
+        segment: null,
+        stage: 'new',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: '2',
+        organizationId: otherOrgId,
+        name: 'Customer 2',
+        industry: null,
+        segment: null,
+        stage: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }, // Different org
     ];
 
-    mockPrisma.customerAccount.findMany.mockResolvedValue(mockCustomers);
+    mockPrisma.customerAccount.findMany.mockImplementation(
+      async (args: { where?: { organizationId?: string } }) =>
+        mockCustomers.filter((c) => c.organizationId === args?.where?.organizationId),
+    );
 
     const result = await repo.listCustomers(testCtx);
 
@@ -165,17 +271,29 @@ describe('CatalogRepo - Tenancy Isolation', () => {
 
   // Test that withTenant is properly called
   test('uses withTenant for all repository operations', async () => {
-    const mockCustomers = [{ id: '1', organizationId: testOrgId, name: 'Customer 1', industry: null, segment: null, stage: 'new', createdAt: new Date(), updatedAt: new Date() }];
+    const mockCustomers = [
+      {
+        id: '1',
+        organizationId: testOrgId,
+        name: 'Customer 1',
+        industry: null,
+        segment: null,
+        stage: 'new',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
     mockPrisma.customerAccount.findMany.mockResolvedValue(mockCustomers);
 
-    // Mock withTenant to verify it's called
-    const withTenantSpy = vi.spyOn(require('./tenant-ctx'), 'withTenant');
-    withTenantSpy.mockImplementation(async (ctx, callback) => {
-      return callback(mockPrisma as unknown as PrismaClient);
+    // withTenant is already mocked at module scope (mockWithTenant) — no need to
+    // spy via a `require()`-style import, which ESLint forbids.
+    mockWithTenant.mockImplementation(async (_ctx: unknown, callback: unknown) => {
+      const run = callback as (tx: PrismaClient) => Promise<unknown>;
+      return run(mockPrisma as unknown as PrismaClient);
     });
 
     await repo.listCustomers(testCtx);
 
-    expect(withTenantSpy).toHaveBeenCalledWith(testCtx, expect.any(Function));
+    expect(mockWithTenant).toHaveBeenCalledWith(testCtx, expect.any(Function));
   });
 });

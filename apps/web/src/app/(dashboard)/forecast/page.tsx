@@ -3,15 +3,39 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { toast } from '@/components/ui/use-toast';
-import { Update } from 'lucide-react';
+import { Loader2, MoreHorizontal } from 'lucide-react';
 
 import { formatCurrency } from '@/lib/utils/format-currency';
 
@@ -120,17 +144,20 @@ export default function ForecastPage() {
       }
 
       // Update the overrides list optimistically
-      setOverrides(prev => {
-        const existingIndex = prev.findIndex(o => o.month === editFormData.month);
+      setOverrides((prev) => {
+        const existingIndex = prev.findIndex((o) => o.month === editFormData.month);
         if (existingIndex >= 0) {
           const updated = [...prev];
           updated[existingIndex] = {
-            ...json.data as ForecastOverride,
+            ...(json.data as ForecastOverride),
             updatedAt: new Date(),
           };
           return updated;
         } else {
-          return [...prev, { ...json.data as ForecastOverride, createdAt: new Date(), updatedAt: new Date() }];
+          return [
+            ...prev,
+            { ...(json.data as ForecastOverride), createdAt: new Date(), updatedAt: new Date() },
+          ];
         }
       });
 
@@ -162,7 +189,7 @@ export default function ForecastPage() {
   // Handle delete override
   async function handleDelete(month: string) {
     // Find the override to delete
-    const overrideToDelete = overrides.find(o => o.month === month);
+    const overrideToDelete = overrides.find((o) => o.month === month);
     if (!overrideToDelete) {
       toast({
         title: 'Error',
@@ -183,7 +210,7 @@ export default function ForecastPage() {
       }
 
       // Remove the deleted override from the list optimistically
-      setOverrides(prev => prev.filter(o => o.id !== overrideToDelete.id));
+      setOverrides((prev) => prev.filter((o) => o.id !== overrideToDelete.id));
 
       toast({
         title: 'Success',
@@ -205,7 +232,7 @@ export default function ForecastPage() {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Update className="h-8 w-8 animate-spin" />
+          <Loader2 className="h-8 w-8 animate-spin" />
           <p className="text-muted-foreground">Loading forecast data...</p>
         </div>
       </div>
@@ -237,51 +264,37 @@ export default function ForecastPage() {
         <Card>
           <CardHeader>
             <CardTitle>Pipeline Total</CardTitle>
-            <CardDescription>
-              Total committed amount of all open opportunities
-            </CardDescription>
+            <CardDescription>Total committed amount of all open opportunities</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            <p className="text-2xl font-bold">
-              {formatCurrency(forecastData.pipelineTotal)}
-            </p>
+            <p className="text-2xl font-bold">{formatCurrency(forecastData.pipelineTotal)}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle>Weighted Forecast</CardTitle>
-            <CardDescription>
-              Pipeline adjusted by stage probability
-            </CardDescription>
+            <CardDescription>Pipeline adjusted by stage probability</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            <p className="text-2xl font-bold">
-              {formatCurrency(forecastData.weightedTotal)}
-            </p>
+            <p className="text-2xl font-bold">{formatCurrency(forecastData.weightedTotal)}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle>Open Opportunities</CardTitle>
-            <CardDescription>
-              Number of active deals in pipeline
-            </CardDescription>
+            <CardDescription>Number of active deals in pipeline</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            <p className="text-2xl font-bold">
-              {forecastData.opportunityCount}
-            </p>
+            <p className="text-2xl font-bold">{forecastData.opportunityCount}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle>Quarter Totals</CardTitle>
-            <CardDescription>
-              Current quarter forecast vs. committed
-            </CardDescription>
+            <CardDescription>Current quarter forecast vs. committed</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="space-y-2">
@@ -306,9 +319,7 @@ export default function ForecastPage() {
       <Card>
         <CardHeader>
           <CardTitle>Monthly Forecast</CardTitle>
-          <CardDescription>
-            Forecast breakdown by close month
-          </CardDescription>
+          <CardDescription>Forecast breakdown by close month</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -323,38 +334,38 @@ export default function ForecastPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {forecastData.forecastLines.map(line => {
-                const override = overrides.find(o => o.month === line.month);
+              {forecastData.forecastLines.map((line) => {
+                const override = overrides.find((o) => o.month === line.month);
                 return (
                   <TableRow key={line.month}>
-                    <TableCell>{new Date(line.month + '-01').toLocaleString('default', {
-                      month: 'long',
-                      year: 'numeric',
-                    })}</TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(line.amount)}
+                    <TableCell>
+                      {new Date(line.month + '-01').toLocaleString('default', {
+                        month: 'long',
+                        year: 'numeric',
+                      })}
                     </TableCell>
+                    <TableCell className="text-right">{formatCurrency(line.amount)}</TableCell>
                     <TableCell className="text-right">
                       {formatCurrency(line.weightedAmount)}
                     </TableCell>
                     <TableCell className="text-right">
                       {(line.confidence * 100).toFixed(0)}%
                     </TableCell>
-                    <TableCell className="text-right">
-                      {line.opportunityCount}
-                    </TableCell>
+                    <TableCell className="text-right">{line.opportunityCount}</TableCell>
                     <TableCell className="text-right">
                       {override ? (
                         <>
                           <div className="text-xs text-muted-foreground">
-                            Committed: {formatCurrency(override.committed)}<br />
-                            Best Case: {formatCurrency(override.bestCase)}<br />
+                            Committed: {formatCurrency(override.committed)}
+                            <br />
+                            Best Case: {formatCurrency(override.bestCase)}
+                            <br />
                             Pipeline: {formatCurrency(override.pipeline)}
                           </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon">
-                                <Update className="h-4 w-4" />
+                                <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" sideOffset={4}>
@@ -371,22 +382,29 @@ export default function ForecastPage() {
                               >
                                 Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDelete(override.month)} className="text-destructive">
+                              <DropdownMenuItem
+                                onClick={() => handleDelete(override.month)}
+                                className="text-destructive"
+                              >
                                 Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </>
                       ) : (
-                        <Button variant="outline" size="sm" onClick={() => {
-                          setEditingOverrideId('new');
-                          setEditFormData({
-                            month: line.month,
-                            committed: 0,
-                            bestCase: 0,
-                            pipeline: 0,
-                          });
-                        }}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingOverrideId('new');
+                            setEditFormData({
+                              month: line.month,
+                              committed: 0,
+                              bestCase: 0,
+                              pipeline: 0,
+                            });
+                          }}
+                        >
                           Add Override
                         </Button>
                       )}
@@ -399,13 +417,14 @@ export default function ForecastPage() {
         </CardContent>
       </Card>
 
-      {/* Edit/Add Forecast Override Sheet */}
-      <Sheet>
-        <SheetTrigger>
-          <Button variant="outline" onClick={() => setEditingOverrideId('new')}>
-            Add Forecast Override
-          </Button>
-        </SheetTrigger>
+      {/* Edit/Add Forecast Override Sheet — controlled by editingOverrideId so
+          the row "Edit" / "Add Override" actions actually open it. */}
+      <Sheet
+        open={editingOverrideId !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingOverrideId(null);
+        }}
+      >
         <SheetContent className="w-full md:w-[400px]">
           <SheetHeader>
             <SheetTitle>
@@ -422,7 +441,7 @@ export default function ForecastPage() {
                 id="month"
                 type="month"
                 value={editFormData.month}
-                onChange={e => setEditFormData({ ...editFormData, month: e.target.value })}
+                onChange={(e) => setEditFormData({ ...editFormData, month: e.target.value })}
                 required
               />
             </div>
@@ -433,7 +452,9 @@ export default function ForecastPage() {
                 id="committed"
                 type="number"
                 value={editFormData.committed}
-                onChange={e => setEditFormData({ ...editFormData, committed: Number(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setEditFormData({ ...editFormData, committed: Number(e.target.value) || 0 })
+                }
                 required
                 min="0"
               />
@@ -445,7 +466,9 @@ export default function ForecastPage() {
                 id="bestCase"
                 type="number"
                 value={editFormData.bestCase}
-                onChange={e => setEditFormData({ ...editFormData, bestCase: Number(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setEditFormData({ ...editFormData, bestCase: Number(e.target.value) || 0 })
+                }
                 required
                 min="0"
               />
@@ -457,7 +480,9 @@ export default function ForecastPage() {
                 id="pipeline"
                 type="number"
                 value={editFormData.pipeline}
-                onChange={e => setEditFormData({ ...editFormData, pipeline: Number(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setEditFormData({ ...editFormData, pipeline: Number(e.target.value) || 0 })
+                }
                 required
                 min="0"
               />

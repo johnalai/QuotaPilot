@@ -68,10 +68,7 @@ export function RiskSnapshotCard({ forecast, riskCount, topDeals }: Props) {
                       ? 'bg-yellow-500 text-black'
                       : 'bg-muted text-muted-foreground';
               return (
-                <span
-                  key={sev}
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${color}`}
-                >
+                <span key={sev} className={`rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>
                   {count} {sev}
                 </span>
               );

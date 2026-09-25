@@ -23,14 +23,17 @@ export interface SessionProjection {
  */
 export async function getSessionServer(): Promise<TenantContext | null> {
   const session = await auth();
-  const user = session?.user as (SessionUser | undefined);
+  const user = session?.user as SessionUser | undefined;
   if (!user?.id || !user.organizationId) return null;
-  return { organizationId: user.organizationId, role: (user.role as TenantContext['role']) ?? 'member' };
+  return {
+    organizationId: user.organizationId,
+    role: (user.role as TenantContext['role']) ?? 'member',
+  };
 }
 
 export async function getSessionProjection(): Promise<SessionProjection> {
   const session = await auth();
-  const user = session?.user as (SessionUser | undefined);
+  const user = session?.user as SessionUser | undefined;
   if (!user?.id || !user.organizationId) {
     return { authenticated: false, userId: null, organizationId: null, onboarded: false };
   }

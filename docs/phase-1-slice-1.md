@@ -14,13 +14,13 @@ table in the local dev database. Everything is scratch and reproducible.
 
 Added to `apps/web/package.json`:
 
-| Package                    | Version          | Kind         | Note                                                                 |
-| -------------------------- | ---------------- | ------------ | -------------------------------------------------------------------- |
-| `next-auth`                | `5.0.0-beta.32`  | dependency   | Auth.js v5 (beta line); peer-verified against `next ^16`, `react ^19` |
-| `@auth/prisma-adapter`     | `2.11.3`         | dependency   | peer range supports `@prisma/client` up to `>=6`                      |
-| `@prisma/client`           | `6.19.3`         | dependency   | latest stable 6.x — see version rationale below                       |
-| `argon2`                   | `0.45.1`         | dependency   | native (node-gyp-build); see hashing decision                         |
-| `prisma`                   | `6.19.3`         | devDependency| Prisma CLI (`@prisma/engines` 6.19.3)                                 |
+| Package                | Version         | Kind          | Note                                                                  |
+| ---------------------- | --------------- | ------------- | --------------------------------------------------------------------- |
+| `next-auth`            | `5.0.0-beta.32` | dependency    | Auth.js v5 (beta line); peer-verified against `next ^16`, `react ^19` |
+| `@auth/prisma-adapter` | `2.11.3`        | dependency    | peer range supports `@prisma/client` up to `>=6`                      |
+| `@prisma/client`       | `6.19.3`        | dependency    | latest stable 6.x — see version rationale below                       |
+| `argon2`               | `0.45.1`        | dependency    | native (node-gyp-build); see hashing decision                         |
+| `prisma`               | `6.19.3`        | devDependency | Prisma CLI (`@prisma/engines` 6.19.3)                                 |
 
 Why **Prisma 6.19.3** and not 7.10.0 / 8.0.0-rc:
 
@@ -126,7 +126,7 @@ Local Postgres here is **not** behind PgBouncer. Production will use Supabase's
    another org's rows match **0 rows**. Verified both ways (org_A and org_B
    positive control) in both direct SQL and Prisma.
 3. **Session state does not survive across connections.** A `SET
-   request.jwt.claims` (session-scoped, `is_local=false`) on one connection was
+request.jwt.claims` (session-scoped, `is_local=false`) on one connection was
    invisible on a freshly-opened second connection (NULL; reads still blocked).
    Prisma's default pooled client behaves the same: after the interactive
    transactions commit, later pool queries evaluate the claim as inert.
@@ -165,21 +165,22 @@ Local Postgres here is **not** behind PgBouncer. Production will use Supabase's
 
 ## 8. Test results
 
-| Check | Path | Result |
-| --- | --- | --- |
-| role is `app_role`, `rolbypassrls = f` | direct SQL + Prisma | ✅ |
-| no claim → SELECT blocked (0 rows) | direct SQL + Prisma | ✅ |
-| claim org_A → only org_A rows | direct SQL + Prisma | ✅ |
-| claim org_A → INSERT org_B → RLS error | direct SQL + Prisma | ✅ |
-| claim org_A → UPDATE / DELETE org_B → 0 rows | direct SQL + Prisma | ✅ |
-| claim org_B (positive control) → only org_B rows | direct SQL + Prisma | ✅ |
-| session claim invisible on a fresh connection | direct SQL (2 conns) | ✅ |
-| claim inert after Prisma transactions (later pool query) | Prisma spike | ✅ (7/7) |
+| Check                                                              | Path                        | Result                  |
+| ------------------------------------------------------------------ | --------------------------- | ----------------------- |
+| role is `app_role`, `rolbypassrls = f`                             | direct SQL + Prisma         | ✅                      |
+| no claim → SELECT blocked (0 rows)                                 | direct SQL + Prisma         | ✅                      |
+| claim org_A → only org_A rows                                      | direct SQL + Prisma         | ✅                      |
+| claim org_A → INSERT org_B → RLS error                             | direct SQL + Prisma         | ✅                      |
+| claim org_A → UPDATE / DELETE org_B → 0 rows                       | direct SQL + Prisma         | ✅                      |
+| claim org_B (positive control) → only org_B rows                   | direct SQL + Prisma         | ✅                      |
+| session claim invisible on a fresh connection                      | direct SQL (2 conns)        | ✅                      |
+| claim inert after Prisma transactions (later pool query)           | Prisma spike                | ✅ (7/7)                |
 | session-scoped claim persists on a reused connection (danger demo) | Prisma `connection_limit=1` | ✅ (observed, expected) |
 
 Password hashing: `apps/web/src/lib/password.test.ts` 4/4 ✅.
 
 Files used in this slice (all scratch unless noted):
+
 - `apps/web/src/lib/password.ts` + `password.test.ts` — **kept** (real helper/test).
 - `apps/web/src/lib/db/spikes/{rls-scratch-setup.sql,rls-scratch-direct-checks.sql,rls-scratch-cleanup.sql,prisma.spike.prisma,rls-scratch.spike.ts,vitest.spike.config.ts}` — **throwaway, delete with cleanup.sql after milestone**.
 - `apps/web/package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml` — **kept** (deps + allowBuilds).

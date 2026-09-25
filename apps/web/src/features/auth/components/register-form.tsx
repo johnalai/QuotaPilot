@@ -39,11 +39,24 @@ export function RegisterForm() {
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="organizationName">Organization</Label>
-        <Input id="organizationName" name="organizationName" type="text" required disabled={pending} />
+        <Input
+          id="organizationName"
+          name="organizationName"
+          type="text"
+          required
+          disabled={pending}
+        />
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="password">Password</Label>
-        <Input id="password" name="password" type="password" required disabled={pending} minLength={8} />
+        <Input
+          id="password"
+          name="password"
+          type="password"
+          required
+          disabled={pending}
+          minLength={8}
+        />
       </div>
 
       {state && (

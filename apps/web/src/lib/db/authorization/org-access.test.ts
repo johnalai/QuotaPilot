@@ -52,7 +52,13 @@ describe('read access (active membership required)', () => {
 
   it('denies read for a deactivated or invited membership', () => {
     for (const status of ['invited', 'deactivated'] as const) {
-      expect(authorizeOrganization(ctx('org_A'), [{ organizationId: 'org_A', role: 'member', status }], 'read')).toEqual({
+      expect(
+        authorizeOrganization(
+          ctx('org_A'),
+          [{ organizationId: 'org_A', role: 'member', status }],
+          'read',
+        ),
+      ).toEqual({
         allowed: false,
         reason: 'membership-inactive',
       });
@@ -66,8 +72,12 @@ describe('update access (owner/admin only)', () => {
   ];
 
   it('allows update for owner and admin only', () => {
-    expect(authorizeOrganization(ctx('org_A', 'owner'), memberOf('owner'), 'update').allowed).toBe(true);
-    expect(authorizeOrganization(ctx('org_A', 'admin'), memberOf('admin'), 'update').allowed).toBe(true);
+    expect(authorizeOrganization(ctx('org_A', 'owner'), memberOf('owner'), 'update').allowed).toBe(
+      true,
+    );
+    expect(authorizeOrganization(ctx('org_A', 'admin'), memberOf('admin'), 'update').allowed).toBe(
+      true,
+    );
   });
 
   it('denies update for a plain member even on their own org', () => {

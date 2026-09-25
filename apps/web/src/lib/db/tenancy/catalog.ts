@@ -202,17 +202,16 @@ export class CatalogRepo {
 
   async listCustomers(ctx: { organizationId: string }): Promise<CustomerRow[]> {
     return withTenant(ctx, async (tx) =>
-      (await tx.customerAccount.findMany({
-        where: { organizationId: ctx.organizationId },
-        orderBy: { name: 'asc' },
-      })).map(toCustomer),
+      (
+        await tx.customerAccount.findMany({
+          where: { organizationId: ctx.organizationId },
+          orderBy: { name: 'asc' },
+        })
+      ).map(toCustomer),
     );
   }
 
-  async getCustomer(
-    ctx: { organizationId: string },
-    id: string,
-  ): Promise<CustomerRow | null> {
+  async getCustomer(ctx: { organizationId: string }, id: string): Promise<CustomerRow | null> {
     return withTenant(ctx, async (tx) => {
       const r = await tx.customerAccount.findFirst({
         where: { id, organizationId: ctx.organizationId },
@@ -242,10 +241,12 @@ export class CatalogRepo {
 
   async listDeals(ctx: { organizationId: string }): Promise<DealRow[]> {
     return withTenant(ctx, async (tx) =>
-      (await tx.dealOpportunity.findMany({
-        where: { organizationId: ctx.organizationId },
-        orderBy: { closeDate: 'asc' },
-      })).map(toDeal),
+      (
+        await tx.dealOpportunity.findMany({
+          where: { organizationId: ctx.organizationId },
+          orderBy: { closeDate: 'asc' },
+        })
+      ).map(toDeal),
     );
   }
 
@@ -276,7 +277,8 @@ export class CatalogRepo {
             organizationId: ctx.organizationId,
             accountId: input.accountId,
             name: input.name,
-            stage: input.stage as 'prospecting' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost',
+            stage: input.stage as
+              'prospecting' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost',
             amount: input.amount,
             closeDate: new Date(input.closeDate),
             ownerId: input.ownerId,
@@ -288,28 +290,34 @@ export class CatalogRepo {
 
   async listForecast(ctx: { organizationId: string }): Promise<ForecastLineRow[]> {
     return withTenant(ctx, async (tx) =>
-      (await tx.forecastLine.findMany({
-        where: { organizationId: ctx.organizationId },
-        orderBy: { month: 'asc' },
-      })).map(toForecast),
+      (
+        await tx.forecastLine.findMany({
+          where: { organizationId: ctx.organizationId },
+          orderBy: { month: 'asc' },
+        })
+      ).map(toForecast),
     );
   }
 
   async listRiskSignals(ctx: { organizationId: string }): Promise<RiskSignalRow[]> {
     return withTenant(ctx, async (tx) =>
-      (await tx.riskSignal.findMany({
-        where: { organizationId: ctx.organizationId },
-        orderBy: [{ severity: 'desc' }, { createdAt: 'desc' }],
-      })).map(toRisk),
+      (
+        await tx.riskSignal.findMany({
+          where: { organizationId: ctx.organizationId },
+          orderBy: [{ severity: 'desc' }, { createdAt: 'desc' }],
+        })
+      ).map(toRisk),
     );
   }
 
   async listActionTasks(ctx: { organizationId: string }): Promise<ActionTaskRow[]> {
     return withTenant(ctx, async (tx) =>
-      (await tx.actionTask.findMany({
-        where: { organizationId: ctx.organizationId },
-        orderBy: { dueDate: 'asc' },
-      })).map(toTask),
+      (
+        await tx.actionTask.findMany({
+          where: { organizationId: ctx.organizationId },
+          orderBy: { dueDate: 'asc' },
+        })
+      ).map(toTask),
     );
   }
 
@@ -361,10 +369,12 @@ export class CatalogRepo {
 
   async listForecastOverrides(ctx: { organizationId: string }): Promise<ForecastOverrideRow[]> {
     return withTenant(ctx, async (tx) =>
-      (await tx.forecastOverride.findMany({
-        where: { organizationId: ctx.organizationId },
-        orderBy: { month: 'asc' },
-      })).map(toForecastOverride),
+      (
+        await tx.forecastOverride.findMany({
+          where: { organizationId: ctx.organizationId },
+          orderBy: { month: 'asc' },
+        })
+      ).map(toForecastOverride),
     );
   }
 

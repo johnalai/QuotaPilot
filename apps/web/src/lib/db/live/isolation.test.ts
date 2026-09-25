@@ -137,7 +137,8 @@ describe('RLS backstop on membership (transaction-scoped claim, null-safe predic
     const p = appRole();
     await p.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT set_config('request.jwt.claims', ${claim(ORG_A)}, true)`;
-      const updated = await tx.$executeRaw`UPDATE membership SET role = 'admin' WHERE organization_id = ${ORG_B}`;
+      const updated =
+        await tx.$executeRaw`UPDATE membership SET role = 'admin' WHERE organization_id = ${ORG_B}`;
       expect(updated).toBe(0);
       const deleted = await tx.$executeRaw`DELETE FROM membership WHERE organization_id = ${ORG_B}`;
       expect(deleted).toBe(0);

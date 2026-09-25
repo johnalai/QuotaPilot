@@ -173,7 +173,7 @@ transaction. Session-scoped claims are **rejected** (§7.2 evidence below).
   The `NULLIF(..., '')` guard is **mandatory**: once the placeholder GUC has
   been `SET` anywhere on the server, a reused pooled connection can read `''`
   (placeholder default), and the naive form then throws `22P02 invalid input
-  syntax for type json` — a loud crash mid-request — instead of failing closed.
+syntax for type json` — a loud crash mid-request — instead of failing closed.
   Both NULL (fresh connection) and `''` must mean "no claim". Observed during
   the Phase 1 spike.
 - **Fail closed.** When the claim is missing, empty, malformed, or its `org_id`
@@ -182,8 +182,8 @@ transaction. Session-scoped claims are **rejected** (§7.2 evidence below).
   filter. **Defense-in-depth must fail quiet, not fail loud.**
 - **Claim setting (per HTTP request).** The service layer opens a **Prisma
   interactive transaction** and executes `select set_config('request.jwt.claims',
-  '<json claim>', true)` — the third argument `true` is **transaction-local**,
-  equivalent to `SET LOCAL` — *before* any tenant-scoped repository query.
+'<json claim>', true)` — the third argument `true` is **transaction-local**,
+  equivalent to `SET LOCAL` — _before_ any tenant-scoped repository query.
 - **Transaction-bound client.** Every tenant-scoped repository operation in that
   request must use the **transaction-bound Prisma client** (`tx`), **never the
   root/global Prisma client**, so the claim is always present on the exact

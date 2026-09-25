@@ -48,9 +48,7 @@ export async function loginAction(
   // link the new session to the same visitor.
   const cookieStore = await cookies();
   const existing = cookieStore.get('next-auth.session-token');
-  const cookieHeader = existing
-    ? `next-auth.session-token=${existing.value}`
-    : undefined;
+  const cookieHeader = existing ? `next-auth.session-token=${existing.value}` : undefined;
 
   const headersList = await headers();
   const origin = headersList.get('origin') ?? process.env.NEXTAUTH_URL ?? 'http://localhost:3000';

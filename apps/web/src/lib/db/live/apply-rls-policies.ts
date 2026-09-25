@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { PrismaClient } from '@prisma/client';
 
 const APP_URL = process.env.APP_DATABASE_URL;
@@ -16,9 +19,10 @@ const owner = new PrismaClient({ datasources: { db: { url: OWNER_URL } } });
 async function main() {
   try {
     // Read the RLS SQL file
-    const fs = require('fs');
-    const path = require('path');
-    const sql = fs.readFileSync(path.resolve(__dirname, '../../../../prisma/phase2a-rls.sql'), 'utf8');
+    const sql = fs.readFileSync(
+      path.resolve(import.meta.dirname, '../../../../prisma/phase2a-rls.sql'),
+      'utf8',
+    );
 
     // Split by semicolon and execute each statement
     const statements = sql
@@ -44,7 +48,7 @@ async function main() {
   }
 }
 
-main().catch(e => {
+main().catch((e) => {
   console.error(e);
   process.exit(1);
 });

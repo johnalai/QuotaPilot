@@ -2,10 +2,7 @@ import * as React from 'react';
 
 import { cn } from 'cn';
 
-function Label({
-  className,
-  ...props
-}: React.ComponentPropsWithoutRef<'label'>) {
+function Label({ className, ...props }: React.ComponentPropsWithoutRef<'label'>) {
   return (
     <label
       className={cn(

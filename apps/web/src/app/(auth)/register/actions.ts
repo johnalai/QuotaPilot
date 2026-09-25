@@ -58,12 +58,13 @@ export async function registerAction(
   }
   const data = parsed.data;
 
-  const slugBase = data.organizationName
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 40) || 'org';
+  const slugBase =
+    data.organizationName
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 40) || 'org';
 
   try {
     const result = await prisma.$transaction(async (tx) => {

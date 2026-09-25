@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./rules": "./src/rules/index.ts",
+    "./rules/forecast": "./src/rules/forecast.ts",
     "./lib/money": "./src/lib/money.ts"
   },
   "scripts": {

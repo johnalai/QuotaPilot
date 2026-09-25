@@ -18,12 +18,7 @@ import type { TenantContext } from '@/lib/db/client';
  * | edit org settings, quotas, plan      | ✓     | ✓     | ✗      |
  * | change roles / delete org            | ✓     | ✗     | ✗      |
  */
-export type Ability =
-  | 'view'
-  | 'mutate'
-  | 'manage_members'
-  | 'manage_settings'
-  | 'manage_org';
+export type Ability = 'view' | 'mutate' | 'manage_members' | 'manage_settings' | 'manage_org';
 
 const MATRIX: Record<Ability, ReadonlyArray<TenantContext['role']>> = {
   view: ['owner', 'admin', 'member'],

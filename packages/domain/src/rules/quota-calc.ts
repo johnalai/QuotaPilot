@@ -64,7 +64,10 @@ export function calculateQuotaPlan(input: QuotaCalcInput): QuotaCalcOutput {
   // Backward funnel — each stage needs the next stage's count ÷ its rate.
   const requiredWins = assertSafeInt(Math.ceil(i.quotaAmount / i.avgDealValue), 'requiredWins');
   const requiredQualifiedOpportunities = ceilDiv(requiredWins, i.winRate);
-  const requiredDiscoveryMeetings = ceilDiv(requiredQualifiedOpportunities, i.opportunityConversionRate);
+  const requiredDiscoveryMeetings = ceilDiv(
+    requiredQualifiedOpportunities,
+    i.opportunityConversionRate,
+  );
   const requiredFirstMeetings = ceilDiv(requiredDiscoveryMeetings, i.discoveryConversionRate);
   const requiredAttempts = ceilDiv(requiredFirstMeetings, i.firstMeetingConversionRate);
 
@@ -104,7 +107,11 @@ export function calculateQuotaPlan(input: QuotaCalcInput): QuotaCalcOutput {
 }
 
 /** Scale whole-cycle targets down to a per-period pacing target, rounded up. */
-function paceTargets(targets: QuotaCalcTargets, cycleMonths: number, weeksPerMonth: number): QuotaCalcTargets {
+function paceTargets(
+  targets: QuotaCalcTargets,
+  cycleMonths: number,
+  weeksPerMonth: number,
+): QuotaCalcTargets {
   const periods = cycleMonths * weeksPerMonth;
   return {
     requiredWins: assertSafeInt(Math.ceil(targets.requiredWins / periods), 'paced requiredWins'),
@@ -120,7 +127,10 @@ function paceTargets(targets: QuotaCalcTargets, cycleMonths: number, weeksPerMon
       Math.ceil(targets.requiredFirstMeetings / periods),
       'paced requiredFirstMeetings',
     ),
-    requiredAttempts: assertSafeInt(Math.ceil(targets.requiredAttempts / periods), 'paced requiredAttempts'),
+    requiredAttempts: assertSafeInt(
+      Math.ceil(targets.requiredAttempts / periods),
+      'paced requiredAttempts',
+    ),
     requiredPipelineValue: assertSafeInt(
       Math.ceil(targets.requiredPipelineValue / periods),
       'paced requiredPipelineValue',

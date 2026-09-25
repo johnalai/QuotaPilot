@@ -41,19 +41,78 @@ const DEMO = {
 };
 
 const ACCOUNTS = [
-  { id: 'seed-ac-001', name: 'Globex Corp', industry: 'Manufacturing', segment: 'enterprise', stage: 'active' as const },
-  { id: 'seed-ac-002', name: 'Initech LLC', industry: 'Technology', segment: 'smb', stage: 'active' as const },
-  { id: 'seed-ac-003', name: 'Umbrella Group', industry: 'Healthcare', segment: 'enterprise', stage: 'at_risk' as const },
-  { id: 'seed-ac-004', name: 'Stark Industries', industry: 'Technology', segment: 'enterprise', stage: 'new' as const },
+  {
+    id: 'seed-ac-001',
+    name: 'Globex Corp',
+    industry: 'Manufacturing',
+    segment: 'enterprise',
+    stage: 'active' as const,
+  },
+  {
+    id: 'seed-ac-002',
+    name: 'Initech LLC',
+    industry: 'Technology',
+    segment: 'smb',
+    stage: 'active' as const,
+  },
+  {
+    id: 'seed-ac-003',
+    name: 'Umbrella Group',
+    industry: 'Healthcare',
+    segment: 'enterprise',
+    stage: 'at_risk' as const,
+  },
+  {
+    id: 'seed-ac-004',
+    name: 'Stark Industries',
+    industry: 'Technology',
+    segment: 'enterprise',
+    stage: 'new' as const,
+  },
 ];
 
 const DEALS = [
   // id, accountId, name, stage, amount, closeDate
-  { id: 'seed-dl-001', accountId: 'seed-ac-001', name: 'Globex renewal', stage: 'negotiation' as const, amount: 450_000, closeDate: '2026-09-28' },
-  { id: 'seed-dl-002', accountId: 'seed-ac-002', name: 'Initech platform upgrade', stage: 'proposal' as const, amount: 300_000, closeDate: '2026-10-12' },
-  { id: 'seed-dl-003', accountId: 'seed-ac-003', name: 'Umbrella contract', stage: 'qualified' as const, amount: 600_000, closeDate: '2026-09-20' },
-  { id: 'seed-dl-004', accountId: 'seed-ac-004', name: 'Stark pilot', stage: 'prospecting' as const, amount: 150_000, closeDate: '2026-11-01' },
-  { id: 'seed-dl-005', accountId: 'seed-ac-001', name: 'Globex add-on', stage: 'prospecting' as const, amount: 100_000, closeDate: '2026-11-15' },
+  {
+    id: 'seed-dl-001',
+    accountId: 'seed-ac-001',
+    name: 'Globex renewal',
+    stage: 'negotiation' as const,
+    amount: 450_000,
+    closeDate: '2026-09-28',
+  },
+  {
+    id: 'seed-dl-002',
+    accountId: 'seed-ac-002',
+    name: 'Initech platform upgrade',
+    stage: 'proposal' as const,
+    amount: 300_000,
+    closeDate: '2026-10-12',
+  },
+  {
+    id: 'seed-dl-003',
+    accountId: 'seed-ac-003',
+    name: 'Umbrella contract',
+    stage: 'qualified' as const,
+    amount: 600_000,
+    closeDate: '2026-09-20',
+  },
+  {
+    id: 'seed-dl-004',
+    accountId: 'seed-ac-004',
+    name: 'Stark pilot',
+    stage: 'prospecting' as const,
+    amount: 150_000,
+    closeDate: '2026-11-01',
+  },
+  {
+    id: 'seed-dl-005',
+    accountId: 'seed-ac-001',
+    name: 'Globex add-on',
+    stage: 'prospecting' as const,
+    amount: 100_000,
+    closeDate: '2026-11-15',
+  },
 ];
 
 const FORECAST = [
@@ -65,10 +124,30 @@ const FORECAST = [
 ];
 
 const TASKS = [
-  { title: 'Call Globex on renewal terms', kind: 'call' as const, opportunityId: 'seed-dl-001', dueDate: '2026-09-22' },
-  { title: 'Demo for Initech platform upgrade', kind: 'demo' as const, opportunityId: 'seed-dl-002', dueDate: '2026-09-24' },
-  { title: 'Review Umbrella risk flags', kind: 'review' as const, opportunityId: 'seed-dl-003', dueDate: '2026-09-21' },
-  { title: 'Outreach: Stark pilot', kind: 'outreach' as const, opportunityId: 'seed-dl-004', dueDate: '2026-09-23' },
+  {
+    title: 'Call Globex on renewal terms',
+    kind: 'call' as const,
+    opportunityId: 'seed-dl-001',
+    dueDate: '2026-09-22',
+  },
+  {
+    title: 'Demo for Initech platform upgrade',
+    kind: 'demo' as const,
+    opportunityId: 'seed-dl-002',
+    dueDate: '2026-09-24',
+  },
+  {
+    title: 'Review Umbrella risk flags',
+    kind: 'review' as const,
+    opportunityId: 'seed-dl-003',
+    dueDate: '2026-09-21',
+  },
+  {
+    title: 'Outreach: Stark pilot',
+    kind: 'outreach' as const,
+    opportunityId: 'seed-dl-004',
+    dueDate: '2026-09-23',
+  },
 ];
 
 async function main() {
@@ -123,15 +202,32 @@ async function main() {
     await prisma.dealOpportunity.upsert({
       where: { id: d.id },
       update: {},
-      create: { organizationId: DEMO.orgId, ownerId: DEMO.owner.id, ...d, closeDate: new Date(d.closeDate) },
+      create: {
+        organizationId: DEMO.orgId,
+        ownerId: DEMO.owner.id,
+        ...d,
+        closeDate: new Date(d.closeDate),
+      },
     });
   }
 
   for (const f of FORECAST) {
     await prisma.forecastLine.upsert({
-      where: { organizationId_opportunityId_month: { organizationId: DEMO.orgId, opportunityId: f.opportunityId, month: f.month } },
+      where: {
+        organizationId_opportunityId_month: {
+          organizationId: DEMO.orgId,
+          opportunityId: f.opportunityId,
+          month: f.month,
+        },
+      },
       update: {},
-      create: { organizationId: DEMO.orgId, opportunityId: f.opportunityId, month: f.month, amount: f.amount, confidence: f.confidence },
+      create: {
+        organizationId: DEMO.orgId,
+        opportunityId: f.opportunityId,
+        month: f.month,
+        amount: f.amount,
+        confidence: f.confidence,
+      },
     });
   }
 
@@ -139,11 +235,24 @@ async function main() {
     await prisma.actionTask.upsert({
       where: { id: `seed-task-${t.opportunityId}` },
       update: {},
-      create: { organizationId: DEMO.orgId, ...t, id: `seed-task-${t.opportunityId}`, dueDate: new Date(t.dueDate) },
+      create: {
+        organizationId: DEMO.orgId,
+        ...t,
+        id: `seed-task-${t.opportunityId}`,
+        dueDate: new Date(t.dueDate),
+      },
     });
   }
 
-  console.log('Seed complete: demo org', DEMO.orgId, 'with', DEALS.length, 'deals,', TASKS.length, 'tasks.');
+  console.log(
+    'Seed complete: demo org',
+    DEMO.orgId,
+    'with',
+    DEALS.length,
+    'deals,',
+    TASKS.length,
+    'tasks.',
+  );
 }
 
 main()

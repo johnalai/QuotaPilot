@@ -85,12 +85,14 @@ describe('RLS backstop on forecast_override (transaction-scoped claim)', () => {
     const p = appRole();
     await p.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT set_config('request.jwt.claims', ${claim(ORG_A)}, true)`;
-      const rows = await tx.$queryRaw<{ organization_id: string, month: string }[]>`
+      const rows = await tx.$queryRaw<{ organization_id: string; month: string }[]>`
         SELECT organization_id, month FROM forecast_override WHERE organization_id IN (${ORG_A}, ${ORG_B}) ORDER BY organization_id, month`;
-      expect(rows.map((r) => ({
-        organization_id: r.organization_id,
-        month: r.month
-      }))).toEqual([
+      expect(
+        rows.map((r) => ({
+          organization_id: r.organization_id,
+          month: r.month,
+        })),
+      ).toEqual([
         { organization_id: ORG_A, month: '2026-01' },
         { organization_id: ORG_A, month: '2026-02' },
       ]);
@@ -129,12 +131,14 @@ describe('RLS backstop on forecast_override (transaction-scoped claim)', () => {
     const p = appRole();
     await p.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT set_config('request.jwt.claims', ${claim(ORG_B)}, true)`;
-      const rows = await tx.$queryRaw<{ organization_id: string, month: string }[]>`
+      const rows = await tx.$queryRaw<{ organization_id: string; month: string }[]>`
         SELECT organization_id, month FROM forecast_override WHERE organization_id IN (${ORG_A}, ${ORG_B}) ORDER BY organization_id, month`;
-      expect(rows.map((r) => ({
-        organization_id: r.organization_id,
-        month: r.month
-      }))).toEqual([
+      expect(
+        rows.map((r) => ({
+          organization_id: r.organization_id,
+          month: r.month,
+        })),
+      ).toEqual([
         { organization_id: ORG_B, month: '2026-01' },
         { organization_id: ORG_B, month: '2026-02' },
       ]);

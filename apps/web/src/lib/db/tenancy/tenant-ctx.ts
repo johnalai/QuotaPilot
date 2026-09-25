@@ -20,7 +20,9 @@ import type { PrismaClient } from '@prisma/client';
  */
 export async function withTenant<T>(
   ctx: { organizationId: string },
-  fn: (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$extends'>) => Promise<T>,
+  fn: (
+    tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$extends'>,
+  ) => Promise<T>,
 ): Promise<T> {
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT set_config('request.jwt.claims', ${JSON.stringify({ org_id: ctx.organizationId })}, true)`;

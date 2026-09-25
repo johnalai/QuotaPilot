@@ -38,9 +38,7 @@ export interface ForecastLineResult {
 }
 
 /** Sum committed pipeline into per-month forecast lines. */
-export function buildForecast(
-  opportunities: Opportunity[],
-): ForecastLineResult[] {
+export function buildForecast(opportunities: Opportunity[]): ForecastLineResult[] {
   const byMonth = new Map<string, { amount: number; weighted: number; count: number }>();
 
   for (const op of opportunities) {
@@ -67,9 +65,7 @@ export function buildForecast(
 
 /** Total committed pipeline across all non-lost opportunities. */
 export function totalPipeline(opportunities: Opportunity[]): number {
-  return opportunities
-    .filter((op) => op.stage !== 'lost')
-    .reduce((sum, op) => sum + op.amount, 0);
+  return opportunities.filter((op) => op.stage !== 'lost').reduce((sum, op) => sum + op.amount, 0);
 }
 
 /** Total weighted (risk-adjusted) forecast value. */
@@ -81,7 +77,5 @@ export function totalWeightedForecast(opportunities: Opportunity[]): number {
 
 /** Total opportunity amount (pipeline) across all non-lost opportunities. */
 export function totalOpportunityAmount(opportunities: Opportunity[]): number {
-  return opportunities
-    .filter((op) => op.stage !== 'lost')
-    .reduce((sum, op) => sum + op.amount, 0);
+  return opportunities.filter((op) => op.stage !== 'lost').reduce((sum, op) => sum + op.amount, 0);
 }
