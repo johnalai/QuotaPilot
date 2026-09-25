@@ -26,6 +26,14 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @quotapilot/web db:generate
 
+      # next-env.d.ts imports ./.next/types/routes.d.ts, and .next is gitignored:
+      # a fresh checkout has no LayoutProps/PageProps globals, so typecheck fails
+      # with "Cannot find name 'LayoutProps'". `next typegen` generates them
+      # without running a full build. (This is why CI typecheck had been red on
+      # every commit while passing locally, where .next already existed.)
+      - name: Generate Next route types
+        run: pnpm --filter @quotapilot/web typegen
+
       - name: Lint
         run: pnpm lint
 

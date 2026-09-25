@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "typegen": "next typegen",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
     "db:migrate": "dotenv -e .env.migration -- prisma migrate dev",
