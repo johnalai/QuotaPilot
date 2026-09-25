@@ -1,10 +1,16 @@
 import Link from 'next/link';
+import { LogOut } from 'lucide-react';
 
+import { logout } from '@/app/(dashboard)/actions';
+import { Button } from '@/components/ui/button';
 import { appNavItems } from '@/config/navigation';
 
 /**
  * Left sidebar for the authenticated shell. Renders declarative nav config
  * (config/navigation.ts) — no sales-domain logic, no data fetching.
+ *
+ * Sign-out is a Server Action bound to a plain form: no client island, and the
+ * session cookie is cleared server-side.
  */
 export function Sidebar() {
   return (
@@ -24,6 +30,13 @@ export function Sidebar() {
           </Link>
         ))}
       </nav>
+
+      <form action={logout} className="mt-auto pt-6">
+        <Button type="submit" variant="ghost" size="sm" className="w-full justify-start gap-2">
+          <LogOut className="size-4 shrink-0" />
+          Sign out
+        </Button>
+      </form>
     </aside>
   );
 }

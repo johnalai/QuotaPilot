@@ -199,6 +199,11 @@ All require a session; all validate with zod; all delegate to services with `Ten
 | `ACCEPT_INVITE`                                              | invite route     | Membership service                                                          | single-use token                          |
 
 All SAs: zod input schema, `authorize(ctx, ability)` check, revalidate affected path tags.
+
+Auth's own mutations live beside their routes rather than in the registry above:
+`app/(auth)/login/actions.ts` (sign-in) and `app/(dashboard)/actions.ts` (sign-out,
+rendered as a plain form in the shell sidebar — no client JS).
+
 **Abilities are the vocabulary in `lib/permissions/abilities.ts`:** `view` · `mutate` ·
 `manage_members` · `manage_settings` · `manage_org`. `authorize(ctx, ability)` returns a
 **boolean** and requires `ctx.role` — never destructure it.

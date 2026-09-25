@@ -5,6 +5,7 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 
 import { prisma } from '@/lib/db/client';
+import { withUserClaim } from '@/lib/db/tenancy/tenant-ctx';
 import { verifyPassword } from '@/lib/password';
 
 /**
@@ -20,6 +21,9 @@ import { verifyPassword } from '@/lib/password';
  *   - `auth` — the request-scoped session resolver used by middleware and the
  *     route layer (replaces getServerSession).
  *   - `handlers` — GET/POST for the `/api/auth/[...nextauth]` route.
+ *   - `signOut` — the server-side sign-out used by the shell's logout Server
+ *     Action. (The login path deliberately does NOT use the server-side
+ *     `signIn`: see app/(auth)/login/actions.ts.)
  *
  * The session payload carries { userId, organizationId, role } so the route
  * layer can build a TenantContext without a second DB round-trip. The client
@@ -40,7 +44,7 @@ type ExtendedUser = {
   role?: string | null;
 };
 
-export const { handlers, auth } = NextAuth({
+export const { handlers, auth, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: 'jwt' },
   providers: [
@@ -63,11 +67,17 @@ export const { handlers, auth } = NextAuth({
         const valid = await verifyPassword(password, user.passwordHash);
         if (!valid) return null;
 
-        // Fetch membership to attach org/role to the token
-        const membership = await prisma.membership.findFirst({
-          where: { userId: user.id, status: 'active' },
-          orderBy: { createdAt: 'asc' },
-        });
+        // Fetch the caller's own membership to attach org/role to the token.
+        // This runs before any tenant context exists, so it uses the identity
+        // claim (withUserClaim → `app.user_id`) rather than the org claim:
+        // `membership` is RLS-protected by the org claim, which cannot be set
+        // yet — discovering the org is the point of this query.
+        const membership = await withUserClaim(user.id, (tx) =>
+          tx.membership.findFirst({
+            where: { userId: user.id, status: 'active' },
+            orderBy: { createdAt: 'asc' },
+          }),
+        );
 
         // Return the bare identity row; org/role are attached in the jwt callback
         return {
@@ -90,18 +100,19 @@ export const { handlers, auth } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      if (token.organizationId) {
-        session.user = session.user ?? {};
-        session.user.id = token.sub!;
-        session.user.organizationId = token.organizationId as string;
-        session.user.role = token.role as string;
+      // `id` is attached unconditionally from the token subject. Gating it on
+      // organizationId made "this user has no active membership" look
+      // identical to "no session at all", which is what made the original
+      // sign-in bug so hard to see.
+      if (session.user && token.sub) {
+        session.user.id = token.sub;
       }
-      // DEBUG: ensure we always have organizationId for demo
-      if (!session.user?.organizationId && token.organizationId) {
-        session.user = session.user ?? {};
+
+      if (session.user && token.organizationId) {
         session.user.organizationId = token.organizationId as string;
         session.user.role = (token.role as string) ?? 'member';
       }
+
       return session;
     },
   },
