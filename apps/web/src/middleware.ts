@@ -43,11 +43,18 @@ export default auth(async (req: NextRequest) => {
     return res;
   }
 
-  // Everything else requires an authenticated, onboarded session.
+  // Everything else requires an authenticated session; onboarding is required
+  // everywhere except the onboarding route itself.
   if (!projection.authenticated) {
     return NextResponse.redirect(new URL('/login', req.url));
   }
-  if (!projection.onboarded) {
+
+  // `/ramp` must NOT be subject to the onboarding redirect. Without this
+  // exemption it redirects to itself (Location: /ramp from /ramp), which is an
+  // infinite loop: the wizard becomes unreachable and every newly registered
+  // user is deadlocked, unable to complete the very flow that clears the gate.
+  // route-map §1: onboarding required "yes except `ramp`".
+  if (!projection.onboarded && !pathname.startsWith('/ramp')) {
     return NextResponse.redirect(new URL('/ramp', req.url));
   }
 

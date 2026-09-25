@@ -1,7 +1,8 @@
 # Status — measured, not planned
 
-**Last verified:** 2026-09-25, at the opportunities-CRUD commit, against a live
-local stack (Postgres + the app running, a real logged-in session).
+**Last verified:** 2026-09-25, against a live local stack (Postgres + the app
+running, a real logged-in session). The commit that last changed this file is the
+pin.
 
 **How to use this file.** It records what has been _observed working_ and what is
 _genuinely absent_, each with the command or artefact that proves it. Read it
@@ -9,9 +10,13 @@ before proposing work. `implementation-plan.md` describes **intent**; this
 describes **state**. Where they disagree, this file wins — and if it goes stale,
 update it in the same commit as the work that changed it.
 
+A bullet here is a **claim**, not proof. Before relying on one — or before
+reporting work as verified — re-run the command or query it cites. A "verified
+working" entry has already been written once for a flow that could not run at all.
+
 ## Gates
 
-All green at the commit above.
+All green as of the commit that last changed this file.
 
 | Gate           | Command                                        | Result                     |
 | -------------- | ---------------------------------------------- | -------------------------- |
@@ -20,7 +25,7 @@ All green at the commit above.
 | Lint           | `pnpm lint`                                    | 0 errors, 3 warnings       |
 | Format         | `pnpm format:check`                            | clean                      |
 | Build          | `pnpm build`                                   | green **with no database** |
-| Isolation gate | `pnpm --filter @quotapilot/web test:isolation` | 8 files, 49 tests          |
+| Isolation gate | `pnpm --filter @quotapilot/web test:isolation` | 9 files, 53 tests          |
 | CI             | GitHub Actions                                 | both jobs green            |
 
 ## Verified working
@@ -34,7 +39,7 @@ Observed over real HTTP against a logged-in session, or by direct database query
 - **Tenancy / RLS** — two roles: `quotapilot` (owner, `rolbypassrls = t`) and
   `quotapilot_app` (runtime, `rolbypassrls = f`). 10 policies across 9 tables;
   4 migrations applied.
-- **Isolation release gate** — 49 live tests, including fails-closed, cross-tenant
+- **Isolation release gate** — 53 live tests, including fails-closed, cross-tenant
   read/write rejection, claim non-leakage across pooled connections, and the
   sign-in identity claim.
 - **Dashboard** (`/dashboard`) — 200, rendering Today plan, Upcoming plan, Sign out.
@@ -49,13 +54,17 @@ Observed over real HTTP against a logged-in session, or by direct database query
   another org's account (see the traps).
 - **Domain rules** — forecast, daily/multi-day plan, priority, risk, quota calc;
   pure and unit-tested.
+- **Onboarding wizard** — `/ramp` renders the wizard (200); an un-onboarded user
+  hitting any other guarded route is sent there (307); completing **or** skipping
+  sets `onboarded_at`, after which `/dashboard` returns 200. The loop that made
+  this unreachable is fixed (see the traps). Persistence, idempotency and
+  user-scoping are covered by a live test, not just by hand.
 
 ## Genuinely absent or placeholder
 
 - **Placeholder pages** (the feature component is a stub): `/quota`, `/actions`,
-  `/call-coach`, `/weekly-review`, `/ramp`. `/ramp` matters most: a user with
-  `onboarded_at = null` is redirected there, so the first-run experience is a
-  placeholder.
+  `/call-coach`, `/weekly-review`. (`/ramp` is now implemented as the
+  onboarding wizard.)
 - **Invite flow** — the `Invite` model and `invite_isolation` policy exist; there
   is no route, handler, or accept action.
 - **No `Meeting` model** in the schema.
@@ -104,15 +113,24 @@ Each of these cost real debugging time. Do not rediscover them.
 - A foreign key that crosses tenants is not caught by RLS: `deal.account_id` has
   no tenant component, and the policy only checks `organization_id`. Services must
   re-resolve the parent through the scoped repository before writing.
+- A guard that redirects to a route which is itself subject to that guard is an
+  infinite loop. The onboarding gate sent every un-onboarded request to `/ramp`
+  _including_ `/ramp` (`Location: /ramp` from `/ramp`), so the wizard was
+  unreachable and a newly registered user could never clear the gate. Any
+  exemption the guard matrix names (route-map §1: "yes except `ramp`") has to be
+  in the middleware, not only in the document.
+- `'use server'` on a `features/*/service.ts` module is not a marker for "server
+  code" — it publishes **every export as a Server Action** with its own id,
+  callable from the browser. Action modules belong in `app/**/actions.ts`.
 - PowerShell treats `[` in a path as a wildcard — use `-LiteralPath`.
 
 ## Next three steps
 
 1. **Invite flow** — `/invite/[token]`, accept action, role enforced in the
    service layer. This closes the last Phase 1 item.
-2. **`/ramp`** — the post-registration landing page is still a placeholder, and it
-   is the first thing a new user sees.
-3. **`/quota`** — the `QuotaPlan` model, `QuotaPlanRepo` and the quota rules all
+2. **`/quota`** — the `QuotaPlan` model, `QuotaPlanRepo` and the quota rules all
    exist; only the page is a stub.
+3. **`/actions`** — the actions feature is a stub; needs to show today's action
+   plan and integrate with the domain rule modules.
 
-Then: actions, weekly-review, call-coach, and the forecast per-owner breakdown.
+Then: weekly-review, call-coach, and the forecast per-owner breakdown.
