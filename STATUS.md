@@ -64,7 +64,8 @@ Observed over real HTTP against a logged-in session, or by direct database query
 
 - **Placeholder pages** (the feature component is a stub): `/quota`, `/actions`,
   `/call-coach`, `/weekly-review`. (`/ramp` is now implemented as the
-  onboarding wizard.)
+  onboarding wizard.) `/quota`'s service layer exists — `features/quota/service.ts` —
+  but nothing imports it yet: its page and form are still stubs.
 - **Invite flow** — the `Invite` model and `invite_isolation` policy exist; there
   is no route, handler, or accept action.
 - **No `Meeting` model** in the schema.
@@ -128,8 +129,8 @@ Each of these cost real debugging time. Do not rediscover them.
 
 1. **Invite flow** — `/invite/[token]`, accept action, role enforced in the
    service layer. This closes the last Phase 1 item.
-2. **`/quota`** — the `QuotaPlan` model, `QuotaPlanRepo` and the quota rules all
-   exist; only the page is a stub.
+2. **`/quota`** — the `QuotaPlan` model, `QuotaPlanRepo`, the quota rules and now
+   `features/quota/service.ts` all exist; the page, form and a live test remain.
 3. **`/actions`** — the actions feature is a stub; needs to show today's action
    plan and integrate with the domain rule modules.
 
