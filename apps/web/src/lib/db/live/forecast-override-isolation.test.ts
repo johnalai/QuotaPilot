@@ -22,11 +22,25 @@ if (!APP_URL || !OWNER_URL) {
 
 // Seed fixture ids with a per-run suffix so a leaked prior run can never be
 // mistaken for this run's fixture.
-const RUN = Date.now().toString(36);
+const RUN = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 const ORG_A = `forecast-org-a-${RUN}`;
 const ORG_B = `forecast-org-b-${RUN}`;
 const USER = `forecast-user-${RUN}`; // org_A owner + org_B owner
 const userEmail = () => `forecast-user-${RUN}@quotapilot.invalid`;
+
+// Fixture row ids. These MUST be built in JS and passed as bind parameters.
+// Inside a Prisma tagged template, `${...}` becomes a `$n` placeholder, so
+// writing 'm-a1-${RUN}' *inside SQL quotes* sends the literal text `m-a1-$1`:
+// the per-run suffix silently never applied and both forecast suites ended up
+// competing for the same row ids.
+const MEMBERSHIP_A = `m-a1-${RUN}`;
+const MEMBERSHIP_B = `m-b1-${RUN}`;
+const OVERRIDE_IDS = [
+  `override-a-jan-${RUN}`,
+  `override-a-feb-${RUN}`,
+  `override-b-jan-${RUN}`,
+  `override-b-feb-${RUN}`,
+];
 
 const claim = (orgId: string) => JSON.stringify({ org_id: orgId });
 
@@ -49,24 +63,24 @@ beforeAll(async () => {
   await o.$executeRaw`INSERT INTO organization (id, name, slug, quota_currency, updated_at) VALUES (${ORG_A}, 'Org A', ${ORG_A}, 'USD', NOW())`;
   await o.$executeRaw`INSERT INTO organization (id, name, slug, quota_currency, updated_at) VALUES (${ORG_B}, 'Org B', ${ORG_B}, 'USD', NOW())`;
   await o.$executeRaw`INSERT INTO "user" (id, email, updated_at) VALUES (${USER}, ${userEmail()}, NOW())`;
-  await o.$executeRaw`INSERT INTO membership (id, organization_id, user_id, role, updated_at) VALUES ('m-a1-${RUN}', ${ORG_A}, ${USER}, 'owner', NOW())`;
-  await o.$executeRaw`INSERT INTO membership (id, organization_id, user_id, role, updated_at) VALUES ('m-b1-${RUN}', ${ORG_B}, ${USER}, 'owner', NOW())`;
+  await o.$executeRaw`INSERT INTO membership (id, organization_id, user_id, role, updated_at) VALUES (${MEMBERSHIP_A}, ${ORG_A}, ${USER}, 'owner', NOW())`;
+  await o.$executeRaw`INSERT INTO membership (id, organization_id, user_id, role, updated_at) VALUES (${MEMBERSHIP_B}, ${ORG_B}, ${USER}, 'owner', NOW())`;
 
   // Seed forecast overrides for both organizations
   await o.$executeRaw`
     INSERT INTO forecast_override (id, organization_id, month, committed, "bestCase", pipeline, created_at, updated_at)
     VALUES
-    ('override-a-jan-${RUN}', ${ORG_A}, '2026-01', 10000, 15000, 20000, NOW(), NOW()),
-    ('override-a-feb-${RUN}', ${ORG_A}, '2026-02', 12000, 18000, 22000, NOW(), NOW()),
-    ('override-b-jan-${RUN}', ${ORG_B}, '2026-01', 5000, 8000, 12000, NOW(), NOW()),
-    ('override-b-feb-${RUN}', ${ORG_B}, '2026-02', 6000, 9000, 13000, NOW(), NOW())
+    (${OVERRIDE_IDS[0]}, ${ORG_A}, '2026-01', 10000, 15000, 20000, NOW(), NOW()),
+    (${OVERRIDE_IDS[1]}, ${ORG_A}, '2026-02', 12000, 18000, 22000, NOW(), NOW()),
+    (${OVERRIDE_IDS[2]}, ${ORG_B}, '2026-01', 5000, 8000, 12000, NOW(), NOW()),
+    (${OVERRIDE_IDS[3]}, ${ORG_B}, '2026-02', 6000, 9000, 13000, NOW(), NOW())
   `;
 });
 
 afterAll(async () => {
   const o = ownerRole();
-  await o.$executeRaw`DELETE FROM forecast_override WHERE id IN ('override-a-jan-${RUN}', 'override-a-feb-${RUN}', 'override-b-jan-${RUN}', 'override-b-feb-${RUN}')`;
-  await o.$executeRaw`DELETE FROM membership WHERE id IN ('m-a1-${RUN}', 'm-b1-${RUN}')`;
+  await o.$executeRaw`DELETE FROM forecast_override WHERE id IN (${OVERRIDE_IDS[0]}, ${OVERRIDE_IDS[1]}, ${OVERRIDE_IDS[2]}, ${OVERRIDE_IDS[3]})`;
+  await o.$executeRaw`DELETE FROM membership WHERE id IN (${MEMBERSHIP_A}, ${MEMBERSHIP_B})`;
   await o.$executeRaw`DELETE FROM "user" WHERE id IN (${USER})`;
   await o.$executeRaw`DELETE FROM organization WHERE id IN (${ORG_A}, ${ORG_B})`;
   await app?.$disconnect();

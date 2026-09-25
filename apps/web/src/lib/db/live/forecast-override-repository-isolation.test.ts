@@ -26,11 +26,25 @@ if (!APP_URL || !OWNER_URL) {
 
 // Seed fixture ids with a per-run suffix so a leaked prior run can never be
 // mistaken for this run's fixture.
-const RUN = Date.now().toString(36);
+const RUN = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 const ORG_A = `forecast-org-a-${RUN}`;
 const ORG_B = `forecast-org-b-${RUN}`;
 const USER = `forecast-user-${RUN}`; // org_A owner + org_B owner
 const userEmail = () => `forecast-user-${RUN}@quotapilot.invalid`;
+
+// Fixture row ids, built in JS and passed as bind parameters.
+// Inside a Prisma tagged template `${...}` becomes a `$n` placeholder, so
+// writing 'm-a1-${RUN}' *inside SQL quotes* sends the literal text `m-a1-$1` —
+// which meant the per-run suffix never applied, cleanup never matched, and both
+// forecast suites competed for the same row ids.
+const MEMBERSHIP_A = `m-a1-${RUN}`;
+const MEMBERSHIP_B = `m-b1-${RUN}`;
+const OVERRIDE_IDS = [
+  `override-a-jan-${RUN}`,
+  `override-a-feb-${RUN}`,
+  `override-b-jan-${RUN}`,
+  `override-b-feb-${RUN}`,
+];
 
 let app: PrismaClient | null = null;
 let owner: PrismaClient | null = null;
@@ -58,8 +72,8 @@ beforeAll(async () => {
   console.log('USER:', USER);
 
   // Clean up any leftover data from previous runs
-  await o.$executeRaw`DELETE FROM forecast_override WHERE id IN ('override-a-jan-${RUN}', 'override-a-feb-${RUN}', 'override-b-jan-${RUN}', 'override-b-feb-${RUN}')`;
-  await o.$executeRaw`DELETE FROM membership WHERE id IN ('m-a1-${RUN}', 'm-b1-hardcoded')`;
+  await o.$executeRaw`DELETE FROM forecast_override WHERE id IN (${OVERRIDE_IDS[0]}, ${OVERRIDE_IDS[1]}, ${OVERRIDE_IDS[2]}, ${OVERRIDE_IDS[3]})`;
+  await o.$executeRaw`DELETE FROM membership WHERE id IN (${MEMBERSHIP_A}, ${MEMBERSHIP_B})`;
   await o.$executeRaw`DELETE FROM "user" WHERE id = ${USER}`;
   await o.$executeRaw`DELETE FROM organization WHERE id IN (${ORG_A}, ${ORG_B})`;
 
@@ -67,34 +81,24 @@ beforeAll(async () => {
   await o.$executeRaw`INSERT INTO organization (id, name, slug, quota_currency, updated_at) VALUES (${ORG_A}, 'Org A', ${ORG_A}, 'USD', NOW())`;
   await o.$executeRaw`INSERT INTO organization (id, name, slug, quota_currency, updated_at) VALUES (${ORG_B}, 'Org B', ${ORG_B}, 'USD', NOW())`;
   await o.$executeRaw`INSERT INTO "user" (id, email, updated_at) VALUES (${USER}, ${userEmail()}, NOW())`;
-  await o.$executeRaw`INSERT INTO membership (id, organization_id, user_id, role, updated_at) VALUES ('m-a1-${RUN}', ${ORG_A}, ${USER}, 'owner', NOW())`;
-  await o.$executeRaw`INSERT INTO membership (id, organization_id, user_id, role, updated_at) VALUES ('m-b1-hardcoded', ${ORG_B}, ${USER}, 'owner', NOW())`;
+  await o.$executeRaw`INSERT INTO membership (id, organization_id, user_id, role, updated_at) VALUES (${MEMBERSHIP_A}, ${ORG_A}, ${USER}, 'owner', NOW())`;
+  await o.$executeRaw`INSERT INTO membership (id, organization_id, user_id, role, updated_at) VALUES (${MEMBERSHIP_B}, ${ORG_B}, ${USER}, 'owner', NOW())`;
 
   // Seed forecast overrides for both organizations.
-  // All values are interpolated (not `$1`-style) — a tagged template with
-  // trailing arguments is a comma expression, so the placeholders were never
-  // bound and the insert could not run.
-  const overrideIds = [
-    `override-a-jan-${RUN}`,
-    `override-a-feb-${RUN}`,
-    `override-b-jan-${RUN}`,
-    `override-b-feb-${RUN}`,
-  ];
-
   await o.$executeRaw`
     INSERT INTO forecast_override (id, organization_id, month, committed, "bestCase", pipeline, created_at, updated_at)
     VALUES
-    (${overrideIds[0]}, ${ORG_A}, '2026-01', 10000, 15000, 20000, NOW(), NOW()),
-    (${overrideIds[1]}, ${ORG_A}, '2026-02', 12000, 18000, 22000, NOW(), NOW()),
-    (${overrideIds[2]}, ${ORG_B}, '2026-01', 5000, 8000, 12000, NOW(), NOW()),
-    (${overrideIds[3]}, ${ORG_B}, '2026-02', 6000, 9000, 13000, NOW(), NOW())
+    (${OVERRIDE_IDS[0]}, ${ORG_A}, '2026-01', 10000, 15000, 20000, NOW(), NOW()),
+    (${OVERRIDE_IDS[1]}, ${ORG_A}, '2026-02', 12000, 18000, 22000, NOW(), NOW()),
+    (${OVERRIDE_IDS[2]}, ${ORG_B}, '2026-01', 5000, 8000, 12000, NOW(), NOW()),
+    (${OVERRIDE_IDS[3]}, ${ORG_B}, '2026-02', 6000, 9000, 13000, NOW(), NOW())
   `;
 });
 
 afterAll(async () => {
   const o = ownerRole();
-  await o.$executeRaw`DELETE FROM forecast_override WHERE id IN ('override-a-jan-${RUN}', 'override-a-feb-${RUN}', 'override-b-jan-${RUN}', 'override-b-feb-${RUN}')`;
-  await o.$executeRaw`DELETE FROM membership WHERE id IN (${`m-a1-${RUN}`}, 'm-b1-hardcoded')`;
+  await o.$executeRaw`DELETE FROM forecast_override WHERE id IN (${OVERRIDE_IDS[0]}, ${OVERRIDE_IDS[1]}, ${OVERRIDE_IDS[2]}, ${OVERRIDE_IDS[3]})`;
+  await o.$executeRaw`DELETE FROM membership WHERE id IN (${MEMBERSHIP_A}, ${MEMBERSHIP_B})`;
   await o.$executeRaw`DELETE FROM "user" WHERE id IN (${USER})`;
   await o.$executeRaw`DELETE FROM organization WHERE id IN (${ORG_A}, ${ORG_B})`;
   await app?.$disconnect();
@@ -123,11 +127,18 @@ describe('ForecastOverride repository methods with RLS enforcement', () => {
       expect(overridesB.map((o) => o.month).sort()).toEqual(['2026-01', '2026-02']);
     });
 
-    it('no claim → reads zero rows (fails closed)', async () => {
-      // Create a repository without setting the claim (simulating no tenant context)
-      const catalogNoClaim = new CatalogRepo(appRole());
-      const overrides = await catalogNoClaim.listForecastOverrides({ organizationId: ORG_A });
-      expect(overrides).toHaveLength(0);
+    it('always scopes to the ctx it is given (no unclaimed read path exists)', async () => {
+      // A CatalogRepo read cannot run without a tenant claim: every query goes
+      // through withTenant(ctx), which sets the transaction-scoped claim from
+      // ctx. So "no claim" is impossible through this layer by construction.
+      // The raw client's fails-closed behavior (no claim -> 0 rows) is a
+      // property of the client and is covered by
+      // forecast-override-isolation.test.ts.
+      const freshRepo = new CatalogRepo(appRole());
+      const overrides = await freshRepo.listForecastOverrides({ organizationId: ORG_A });
+
+      expect(overrides).toHaveLength(2);
+      expect(overrides.every((o) => o.organizationId === ORG_A)).toBe(true);
     });
   });
 
@@ -157,14 +168,14 @@ describe('ForecastOverride repository methods with RLS enforcement', () => {
       }
     });
 
-    it('no claim → reads zero rows (fails closed)', async () => {
-      // Create a repository without setting the claim (simulating no tenant context)
-      const catalogNoClaim = new CatalogRepo(appRole());
-      const override = await catalogNoClaim.getForecastOverride(
-        { organizationId: ORG_A },
-        '2026-01',
-      );
-      expect(override).toBeNull();
+    it('scopes to the ctx it is given, never leaking another org', async () => {
+      // Same reasoning as the list case: the claim comes from ctx, so an org A
+      // context returns org A's row and org B's row stays unreachable.
+      const freshRepo = new CatalogRepo(appRole());
+      const override = await freshRepo.getForecastOverride({ organizationId: ORG_A }, '2026-01');
+
+      expect(override).not.toBeNull();
+      expect(override?.organizationId).toBe(ORG_A);
     });
   });
 
