@@ -49,12 +49,22 @@ export async function getDashboardData(ctx: TenantContext): Promise<DashboardDat
     quota: new QuotaPlanRepo(prisma),
   };
 
-  const [plan, deals, , riskRows] = await Promise.all([
-    repos.quota.findByOrg(ctx),
-    repos.catalog.listDeals(ctx),
-    repos.catalog.listForecast(ctx),
-    repos.catalog.listRiskSignals(ctx),
-  ]);
+  // Reads are SEQUENTIAL on purpose.
+  //
+  // Every repository method opens its own `withTenant` interactive transaction,
+  // so fanning them out with Promise.all makes several transactions race for the
+  // connection pool and Prisma fails with P2028 ("Unable to start a transaction
+  // in the given time") — which took the whole dashboard down with a 500.
+  //
+  // The better shape is one tenant transaction per request (a single consistent
+  // snapshot and one claim); that needs tx-bound repository methods, which
+  // CatalogRepo / QuotaPlanRepo do not expose yet.
+  //
+  // `listForecast` used to be called here too, into a discarded slot — a fourth
+  // transaction whose result was never read. Dropped.
+  const plan = await repos.quota.findByOrg(ctx);
+  const deals = await repos.catalog.listDeals(ctx);
+  const riskRows = await repos.catalog.listRiskSignals(ctx);
 
   // Narrow DealRow.stage to the OpportunityStage union for rule modules
   const toOpportunity = (d: DealRow): Opportunity => ({
