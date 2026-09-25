@@ -131,6 +131,7 @@ Each of these cost real debugging time. Do not rediscover them.
    service layer. This closes the last Phase 1 item.
 2. **`/quota`** — the `QuotaPlan` model, `QuotaPlanRepo`, the quota rules and now
    `features/quota/service.ts` all exist; the page, form and a live test remain.
+   **Specified and ready to run: [docs/next-task.md](docs/next-task.md).**
 3. **`/actions`** — the actions feature is a stub; needs to show today's action
    plan and integrate with the domain rule modules.
 

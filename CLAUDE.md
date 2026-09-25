@@ -4,6 +4,8 @@ Guidance for Claude Code (and human contributors) in the QuotaPilot repository. 
 
 > **Current state:** [STATUS.md](STATUS.md) records what is _verified working_, what is _genuinely absent_, and the next three steps — each with the command or artefact that proves it. Read it before proposing work, and update it when your work changes it. `implementation-plan.md` describes intent; STATUS.md describes reality.
 
+> **Next task:** [docs/next-task.md](docs/next-task.md) carries the next unit of work as a self-contained spec — files, rules, required tests and the evidence commands. Start there when picking up the thread.
+
 > Detail lives in the living docs, not here: [architecture.md](architecture.md) (§6 layering, §7.2 RLS claims, §9.2 role matrix) · [domain-model.md](domain-model.md) · [route-map.md](route-map.md) · [implementation-plan.md](implementation-plan.md)
 > Stack decided 2026-09-14: **Next.js full-stack · Supabase+Postgres RLS · Auth.js v5 · multi-provider AI (Vercel AI SDK)**.
 
