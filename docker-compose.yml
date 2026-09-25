@@ -10,7 +10,10 @@ services:
       POSTGRES_PASSWORD: quotapilot
       POSTGRES_DB: quotapilot
     ports:
-      - '5432:5432'
+      # Loopback only. `'5432:5432'` would publish Postgres on every interface,
+      # which on a LAN (or a Tailscale/WSL network) exposes a superuser account
+      # with a weak local-dev password to anything that can route to this host.
+      - '127.0.0.1:5432:5432'
     volumes:
       - quotapilot-db-data:/var/lib/postgresql/data
     healthcheck:

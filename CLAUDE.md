@@ -14,6 +14,7 @@ Multi-tenant SaaS (QuotaPilot) for technical sellers: ramp-up, quota understandi
 - **OS:** Windows (PowerShell default; Bash available). Use `npm`/`pnpm` scripts — no bash-only steps in dev/test.
 - **Package manager:** pnpm workspaces: `apps/web` · `packages/contracts` · `packages/prompts` · `packages/domain`.
 - **Default commands** (as they exist once scaffolded): `pnpm dev` · `pnpm test` (Vitest) · `pnpm lint` / `pnpm typecheck` · `pnpm build` · `pnpm prisma migrate dev` (local — migration is **owner-role only**, never from app code) · `pnpm db:seed`.
+- **Local services:** `scripts/dev-up.ps1` brings up Docker/Postgres, then the **omniroute** model gateway on `127.0.0.1:20128` (~2 min to become ready — Claude Code fails with `ECONNREFUSED` if it starts first), then `pnpm dev`. Postgres is published on loopback only. The live RLS gate is `pnpm --filter @quotapilot/web test:isolation`, which needs that Postgres.
 
 ## 3. Architecture rules (mandatory)
 
