@@ -24,8 +24,23 @@ async function main() {
       'utf8',
     );
 
+    // Strip '--' line comments BEFORE splitting on ';'. phase2a-rls.sql contains
+    // a semicolon inside a comment, which would otherwise split a statement in
+    // half and execute a fragment (syntax error) — and because the ALTER TABLE
+    // ... ENABLE ROW LEVEL SECURITY statements come before the CREATE POLICY
+    // ones, a partial run leaves tables with RLS enabled and no policy, i.e.
+    // deny-all for the app role. Worse than not applying the file at all.
+    //
+    // This is a line-based strip, not a SQL parser: it would also blank a '--'
+    // inside a string literal. This file has none. For the canonical path, see
+    // the header of phase2a-rls.sql (psql -f), which is what CI uses.
+    const withoutComments = sql
+      .split('\n')
+      .map((line) => line.replace(/--.*$/, ''))
+      .join('\n');
+
     // Split by semicolon and execute each statement
-    const statements = sql
+    const statements = withoutComments
       .split(';')
       .map((statement: string) => statement.trim())
       .filter((statement: string) => statement.length > 0);

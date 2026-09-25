@@ -22,6 +22,10 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # The generated client is not committed, so typecheck/build need it.
+      - name: Generate Prisma client
+        run: pnpm --filter @quotapilot/web db:generate
+
       - name: Lint
         run: pnpm lint
 
@@ -36,3 +40,104 @@ jobs:
 
       - name: Format check
         run: pnpm format:check
+
+  # The cross-tenant RLS isolation suite is the "release gate" in CLAUDE.md §5.
+  # It is excluded from `pnpm test` (see vitest.config.ts) because it needs a real
+  # Postgres, so it runs here against a throwaway container.
+  isolation:
+    name: RLS isolation release gate (live Postgres)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: quotapilot
+          POSTGRES_PASSWORD: quotapilot
+          POSTGRES_DB: quotapilot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U quotapilot -d quotapilot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Job-level exports deliberately shadow the .env files: dotenv-cli does not
+      # override variables that are already set in the environment.
+      # Owner / migration role (superuser in this throwaway container only).
+      MIGRATION_DATABASE_URL: postgresql://quotapilot:quotapilot@localhost:5432/quotapilot?schema=public
+      # App role: non-owner, NOBYPASSRLS — the identity that must fail closed.
+      APP_DATABASE_URL: postgresql://quotapilot_app:quotapilot_app@localhost:5432/quotapilot?schema=public
+      # libpq settings for the psql steps. psql cannot consume the URLs above:
+      # `?schema=public` is a Prisma query parameter, and libpq rejects unknown
+      # parameters with `invalid URI query parameter: "schema"`.
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: quotapilot
+      PGPASSWORD: quotapilot
+      PGDATABASE: quotapilot
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # .env.local / .env.migration are gitignored, so CI writes them. Values are
+      # container-local throwaway credentials, never real secrets.
+      - name: Write env files
+        working-directory: apps/web
+        run: |
+          cat > .env.migration <<'EOF'
+          DATABASE_URL=${{ env.MIGRATION_DATABASE_URL }}
+          MIGRATION_DATABASE_URL=${{ env.MIGRATION_DATABASE_URL }}
+          EOF
+
+          cat > .env.local <<'EOF'
+          NEXT_PUBLIC_APP_URL=http://localhost:3000
+          DATABASE_URL=${{ env.APP_DATABASE_URL }}
+          APP_DATABASE_URL=${{ env.APP_DATABASE_URL }}
+          NEXTAUTH_SECRET=ci-placeholder-not-used-by-the-db-suites-min-32-chars
+          EOF
+
+      # Must run BEFORE migrations: the init migration's GRANT and
+      # ALTER DEFAULT PRIVILEGES statements reference this role.
+      - name: Bootstrap RLS-subject app role
+        run: psql -v ON_ERROR_STOP=1 -f apps/web/prisma/bootstrap-app-role.sql
+
+      - name: Verify app role cannot bypass RLS
+        run: |
+          psql -v ON_ERROR_STOP=1 -c \
+            "DO \$\$
+             BEGIN
+               IF (SELECT rolbypassrls FROM pg_roles WHERE rolname = 'quotapilot_app') THEN
+                 RAISE EXCEPTION 'quotapilot_app must NOT have BYPASSRLS';
+               END IF;
+             END \$\$;"
+
+      - name: Generate Prisma client
+        run: pnpm --filter @quotapilot/web db:generate
+
+      - name: Apply migrations (as owner)
+        run: pnpm --filter @quotapilot/web db:deploy
+
+      # Phase 2a RLS policies + grants live in prisma/phase2a-rls.sql (the init
+      # migration only covers membership/invite). Applied with psql, which parses
+      # the whole file. Note that src/lib/db/live/apply-rls-policies.ts must NOT
+      # be used for this: it naively splits on ';' and is tripped by a semicolon
+      # inside a '--' comment. Applying only part of this file is worse than not
+      # applying it — it leaves tables with RLS enabled and no policy (deny-all).
+      - name: Apply RLS policies
+        run: psql -v ON_ERROR_STOP=1 -f apps/web/prisma/phase2a-rls.sql
+
+      - name: Isolation suite (release gate)
+        run: pnpm --filter @quotapilot/web test:isolation
