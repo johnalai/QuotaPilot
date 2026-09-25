@@ -15,17 +15,30 @@ export interface SessionProjection {
 }
 
 /**
+ * The route-layer session value: the org scope plus the acting user.
+ *
+ * `TenantContext` deliberately stays { organizationId, role } — that is what
+ * services and repositories are threaded with. The user id is added here
+ * because the route layer needs it for fields the *server* owns, such as
+ * `DealOpportunity.ownerId`, which the browser must never supply.
+ */
+export interface SessionContext extends TenantContext {
+  userId: string;
+}
+
+/**
  * Resolve the server session and turn it into a TenantContext.
  *
  * This is the single seam the route layer uses to get an org scope. It never
  * trusts a query-string org id: the org comes from the session, and the
  * session's org comes from the JWT token (set in authorize() callback).
  */
-export async function getSessionServer(): Promise<TenantContext | null> {
+export async function getSessionServer(): Promise<SessionContext | null> {
   const session = await auth();
   const user = session?.user as SessionUser | undefined;
   if (!user?.id || !user.organizationId) return null;
   return {
+    userId: user.id,
     organizationId: user.organizationId,
     role: (user.role as TenantContext['role']) ?? 'member',
   };

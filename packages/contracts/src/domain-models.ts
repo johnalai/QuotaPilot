@@ -19,10 +19,23 @@ import { z } from 'zod';
 
 import { iso4217Schema, minorUnitsSchema, rateSchema } from './quota-calc';
 
-/** Shared identifiers. */
-export const uuidSchema = z.string().uuid('must be a valid uuid');
-export const tenantIdSchema = uuidSchema;
-export const userIdSchema = uuidSchema;
+/**
+ * Shared identifiers — opaque strings, deliberately NOT `z.string().uuid()`.
+ *
+ * Prisma generates every id with `@default(cuid(2))` (a CUID is not a UUID), and
+ * the seed uses readable slugs such as `seed-owner-001`. A UUID check therefore
+ * rejects every real row in the database. It looked harmless because nothing
+ * validated an id until the opportunities service did — at which point every
+ * valid create failed with VALIDATION, and the cross-tenant *rejection* test
+ * passed for the wrong reason.
+ *
+ * Format is the database's business; the contract only requires a non-empty id.
+ * The three names below are kept for readability at their use sites.
+ */
+export const idSchema = z.string().trim().min(1, 'id is required');
+export const uuidSchema = idSchema;
+export const tenantIdSchema = idSchema;
+export const userIdSchema = idSchema;
 
 /** ISO-8601 date (YYYY-MM-DD), used for close dates and task due dates. */
 export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD');

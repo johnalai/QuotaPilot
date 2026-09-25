@@ -1,7 +1,7 @@
 # Status — measured, not planned
 
-**Last verified:** 2026-09-25, at commit `ab77fa0`, against a live local stack
-(Postgres + the app running, a real logged-in session).
+**Last verified:** 2026-09-25, at the opportunities-CRUD commit, against a live
+local stack (Postgres + the app running, a real logged-in session).
 
 **How to use this file.** It records what has been _observed working_ and what is
 _genuinely absent_, each with the command or artefact that proves it. Read it
@@ -20,7 +20,7 @@ All green at the commit above.
 | Lint           | `pnpm lint`                                    | 0 errors, 3 warnings       |
 | Format         | `pnpm format:check`                            | clean                      |
 | Build          | `pnpm build`                                   | green **with no database** |
-| Isolation gate | `pnpm --filter @quotapilot/web test:isolation` | 7 files, 43 tests          |
+| Isolation gate | `pnpm --filter @quotapilot/web test:isolation` | 8 files, 49 tests          |
 | CI             | GitHub Actions                                 | both jobs green            |
 
 ## Verified working
@@ -34,7 +34,7 @@ Observed over real HTTP against a logged-in session, or by direct database query
 - **Tenancy / RLS** — two roles: `quotapilot` (owner, `rolbypassrls = t`) and
   `quotapilot_app` (runtime, `rolbypassrls = f`). 10 policies across 9 tables;
   4 migrations applied.
-- **Isolation release gate** — 43 live tests, including fails-closed, cross-tenant
+- **Isolation release gate** — 49 live tests, including fails-closed, cross-tenant
   read/write rejection, claim non-leakage across pooled connections, and the
   sign-in identity claim.
 - **Dashboard** (`/dashboard`) — 200, rendering Today plan, Upcoming plan, Sign out.
@@ -43,15 +43,19 @@ Observed over real HTTP against a logged-in session, or by direct database query
   overrides, clear one).
 - **Accounts** — `/accounts` lists real rows plus a create form;
   `/accounts/[accountId]` 200; an unknown id returns 404 (no existence leak).
+- **Opportunities** — `/opportunities` lists the pipeline with account links and a
+  running committed total, plus a create form; `/opportunities/[opportunityId]`
+  200; an unknown id returns 404. The service refuses an opportunity attached to
+  another org's account (see the traps).
 - **Domain rules** — forecast, daily/multi-day plan, priority, risk, quota calc;
   pure and unit-tested.
 
 ## Genuinely absent or placeholder
 
-- **Placeholder pages** (the feature component is a stub): `/opportunities` (+
-  detail), `/quota`, `/actions`, `/call-coach`, `/weekly-review`, `/ramp`.
-  `/ramp` matters most: a user with `onboarded_at = null` is redirected there, so
-  the first-run experience is a placeholder.
+- **Placeholder pages** (the feature component is a stub): `/quota`, `/actions`,
+  `/call-coach`, `/weekly-review`, `/ramp`. `/ramp` matters most: a user with
+  `onboarded_at = null` is redirected there, so the first-run experience is a
+  placeholder.
 - **Invite flow** — the `Invite` model and `invite_isolation` policy exist; there
   is no route, handler, or accept action.
 - **No `Meeting` model** in the schema.
@@ -65,9 +69,10 @@ Observed over real HTTP against a logged-in session, or by direct database query
   better shape and needs tx-bound repository methods.
 - **No component tests** — there is no React testing setup; page behaviour is
   verified by HTTP checks, not unit tests.
-- **Mutations use two mechanisms** — forecast and accounts writes go through route
-  handlers or Server Actions depending on the file. CLAUDE.md prefers Server
-  Actions throughout.
+- **Mutations use two mechanisms** — the forecast write still goes through a route
+  handler (`/api/forecast/values`), while accounts and opportunities use Server
+  Actions. CLAUDE.md prefers Server Actions throughout; migrating the forecast
+  form is the remaining step.
 
 ## Traps already paid for
 
@@ -90,16 +95,24 @@ Each of these cost real debugging time. Do not rediscover them.
   transaction.
 - A `<Toaster />` without a `Toast.Provider` ancestor throws and 500s every page
   that renders the root layout.
+- The contracts declared ids as `z.string().uuid()`, but Prisma generates
+  `cuid(2)` and the seed uses slugs like `seed-owner-001` — so **no real row could
+  pass**. It stayed hidden because nothing validated an id until the opportunities
+  service did, at which point every valid create failed with VALIDATION while the
+  cross-tenant _rejection_ test passed for the wrong reason. Ids are opaque
+  non-empty strings now.
+- A foreign key that crosses tenants is not caught by RLS: `deal.account_id` has
+  no tenant component, and the policy only checks `organization_id`. Services must
+  re-resolve the parent through the scoped repository before writing.
 - PowerShell treats `[` in a path as a wildcard — use `-LiteralPath`.
 
 ## Next three steps
 
-1. **Opportunities CRUD** — accounts are its parent (`deal.account_id` is NOT
-   NULL). Mirror the accounts shape: service → Server Components → live service
-   tests.
-2. **Invite flow** — `/invite/[token]`, accept action, role enforced in the
+1. **Invite flow** — `/invite/[token]`, accept action, role enforced in the
    service layer. This closes the last Phase 1 item.
-3. **`/ramp`** — the post-registration landing page is still a placeholder, and
-   it is the first thing a new user sees.
+2. **`/ramp`** — the post-registration landing page is still a placeholder, and it
+   is the first thing a new user sees.
+3. **`/quota`** — the `QuotaPlan` model, `QuotaPlanRepo` and the quota rules all
+   exist; only the page is a stub.
 
-Then the remaining placeholders: quota, actions, weekly-review, call-coach.
+Then: actions, weekly-review, call-coach, and the forecast per-owner breakdown.
