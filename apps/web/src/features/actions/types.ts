@@ -1,5 +1,5 @@
 /** domain-model §4. */
-export type TaskKind = 'call' | 'follow_up' | 'prep' | 'research' | 'practice' | 'admin';
+export type TaskKind = 'call' | 'demo' | 'prep' | 'review' | 'outreach';
 export type TaskStatus = 'open' | 'done' | 'skipped';
 
 /** One item on the daily action plan (domain-model §1.14). */

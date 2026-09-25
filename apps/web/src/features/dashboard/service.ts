@@ -7,7 +7,7 @@ import { CatalogRepo, type DealRow } from '@/lib/db/tenancy/catalog';
 import { QuotaPlanRepo } from '@/lib/db/tenancy/quotaplan';
 import { prisma } from '@/lib/db/client';
 
-import { buildDailyPlan, type PlannedTask } from '@quotapilot/domain/rules';
+import { buildDailyPlan, schedulePlan, type PlannedTask } from '@quotapilot/domain/rules';
 import { buildForecast, totalPipeline, totalWeightedForecast } from '@quotapilot/domain/rules';
 import { rankOpportunities } from '@quotapilot/domain/rules';
 import type { Opportunity } from '@quotapilot/contracts';
@@ -28,6 +28,7 @@ export interface DashboardData {
   topDeals: Array<{ id: string; name: string; stage: string; amount: number; score: number }>;
   riskCount: { low: number; medium: number; high: number; critical: number };
   todayPlan: PlannedTask[];
+  multiDayPlan: Array<{ date: string; tasks: PlannedTask[] }>;
 }
 
 /**
@@ -94,6 +95,15 @@ export async function getDashboardData(ctx: TenantContext): Promise<DashboardDat
     ? buildDailyPlan({ opportunities: openDeals, plan: toQuotaPlan(plan) })
     : [];
 
+  // Generate 7-day action plan for the multi-day view
+  const multiDayPlan = plan
+    ? schedulePlan(
+        { opportunities: openDeals, plan: toQuotaPlan(plan) },
+        new Date(), // start from today
+        7, // 7-day plan
+      )
+    : [];
+
   const quota = plan
     ? {
         quotaAmount: plan.quotaAmount,
@@ -114,6 +124,7 @@ export async function getDashboardData(ctx: TenantContext): Promise<DashboardDat
     topDeals,
     riskCount,
     todayPlan,
+    multiDayPlan,
   };
 }
 

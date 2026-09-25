@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/features/dashboard/service';
 import { getSessionServer } from '@/lib/auth/session';
 import { TodayPlanCard } from '@/features/actions';
+import { UpcomingPlanCard } from '@/features/actions';
 import { QuotaProgressCard } from '@/features/quota';
 import { RiskSnapshotCard } from '@/features/weekly-review';
 
@@ -46,6 +47,7 @@ export default async function DashboardPage() {
           />
         )}
         <TodayPlanCard tasks={data.todayPlan} />
+        <UpcomingPlanCard dayPlans={data.multiDayPlan} />
         <RiskSnapshotCard
           forecast={data.forecast}
           riskCount={data.riskCount}

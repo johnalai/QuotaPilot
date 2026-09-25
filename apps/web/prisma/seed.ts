@@ -7,9 +7,9 @@ import argon2 from 'argon2';
  *   pnpm db:seed   (run as the migration owner, never from app code)
  *
  * Creates one demo org with a quota plan, a handful of accounts/opportunities,
- * forecast lines, and action tasks so the MVP dashboard shows real computed
- * numbers instead of placeholders. Idempotent: re-running upserts the same
- * rows by their deterministic ids.
+ * forecast lines, forecast overrides, and action tasks so the MVP dashboard
+ * shows real computed numbers instead of placeholders. Idempotent: re-running
+ * upserts the same rows by their deterministic ids.
  *
  * Money is integer minor units. Nothing here writes a computed field —
  * weightedAmount, risk scores, and priority scores are produced by the rule
@@ -123,6 +123,27 @@ const FORECAST = [
   { opportunityId: 'seed-dl-005', month: '2026-11', amount: 100_000, confidence: 0.1 },
 ];
 
+const FORECAST_OVERRIDES = [
+  {
+    month: '2026-09',
+    committed: 900_000,
+    bestCase: 1_100_000,
+    pipeline: 1_300_000,
+  },
+  {
+    month: '2026-10',
+    committed: 250_000,
+    bestCase: 350_000,
+    pipeline: 400_000,
+  },
+  {
+    month: '2026-11',
+    committed: 200_000,
+    bestCase: 250_000,
+    pipeline: 300_000,
+  },
+];
+
 const TASKS = [
   {
     title: 'Call Globex on renewal terms',
@@ -227,6 +248,26 @@ async function main() {
         month: f.month,
         amount: f.amount,
         confidence: f.confidence,
+      },
+    });
+  }
+
+  // Upsert forecast overrides
+  for (const ovr of FORECAST_OVERRIDES) {
+    await prisma.forecastOverride.upsert({
+      where: {
+        organizationId_month: {
+          organizationId: DEMO.orgId,
+          month: ovr.month,
+        },
+      },
+      update: {},
+      create: {
+        organizationId: DEMO.orgId,
+        ...ovr,
+        id: `override-${DEMO.orgId}-${ovr.month}`,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       },
     });
   }

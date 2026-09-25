@@ -39,7 +39,7 @@ export interface PlannedTask {
   reason: string;
 }
 
-/** Produce a bounded, ranked daily action plan. */
+/** Produce a bounded, ranked daily action plan for a specific day. */
 export function buildDailyPlan(input: PlanInput): PlannedTask[] {
   const { opportunities, plan, today = new Date() } = input;
   const tasks: PlannedTask[] = [];
@@ -100,4 +100,25 @@ export function buildDailyPlan(input: PlanInput): PlannedTask[] {
   }
 
   return tasks.slice(0, DAILY_TASK_CAP);
+}
+
+/** Produce a ranked action plan for a date range (inclusive). */
+export function schedulePlan(
+  input: PlanInput,
+  startDate: Date,
+  numDays: number,
+): { date: string; tasks: PlannedTask[] }[] {
+  const { opportunities, plan } = input;
+  const days: { date: string; tasks: PlannedTask[] }[] = [];
+
+  for (let i = 0; i < numDays; i++) {
+    const currentDate = new Date(startDate);
+    currentDate.setDate(startDate.getDate() + i);
+    const dayInput: PlanInput = { opportunities, plan, today: currentDate };
+    const tasks = buildDailyPlan(dayInput);
+    const dateString = currentDate.toISOString().slice(0, 10); // YYYY-MM-DD
+    days.push({ date: dateString, tasks });
+  }
+
+  return days;
 }
