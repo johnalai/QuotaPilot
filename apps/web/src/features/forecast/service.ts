@@ -13,6 +13,8 @@ import {
 } from '@quotapilot/domain/rules/forecast';
 import type { Opportunity } from '@quotapilot/contracts';
 
+import { currentQuarter, monthsOfQuarter, quarterOf } from './quarters';
+
 export interface ForecastServiceData {
   forecastLines: ForecastLineResult[];
   pipelineTotal: number;
@@ -23,14 +25,6 @@ export interface ForecastServiceData {
     bestCase: number;
     pipeline: number;
   };
-}
-
-/** `2026-05` → the three `YYYY-MM` months of its quarter, starting at that month's quarter. */
-function currentQuarterMonths(now: Date): string[] {
-  const startMonth = Math.floor(now.getUTCMonth() / 3) * 3 + 1;
-  return [0, 1, 2].map(
-    (offset) => `${now.getUTCFullYear()}-${String(startMonth + offset).padStart(2, '0')}`,
-  );
 }
 
 /**
@@ -78,7 +72,7 @@ export async function getForecastData(ctx: TenantContext): Promise<ForecastServi
   });
 
   const openOpportunities = opportunities.filter((op) => op.stage !== 'lost');
-  const quarterMonths = currentQuarterMonths(new Date());
+  const quarterMonths = monthsOfQuarter(currentQuarter(new Date())) ?? [];
   const quarterOpportunities = openOpportunities.filter((op) =>
     quarterMonths.includes(op.closeDate.slice(0, 7)),
   );
@@ -176,4 +170,143 @@ export async function saveForecastValues(
  */
 export async function recomputeForecast(ctx: TenantContext): Promise<ForecastServiceData> {
   return getForecastData(ctx);
+}
+
+// ---------------------------------------------------------------------------
+// Overview — everything the `/forecast` landing page renders
+// ---------------------------------------------------------------------------
+
+export interface ForecastOverviewMonth {
+  month: string;
+  computedAmount: number;
+  computedWeighted: number;
+  confidence: number;
+  opportunityCount: number;
+  /** Explicit seller override for this month, or null when unset. */
+  override: { id: string; committed: number; bestCase: number; pipeline: number } | null;
+}
+
+export interface ForecastOverview {
+  quarter: string;
+  months: ForecastOverviewMonth[];
+  totals: {
+    pipelineTotal: number;
+    weightedTotal: number;
+    opportunityCount: number;
+    quarterCommitted: number;
+    quarterWeighted: number;
+    quarterOpportunities: number;
+  };
+  /** Quarters present in open pipeline, newest first — the drill-down links. */
+  quarters: Array<{ quarter: string; committed: number; opportunityCount: number }>;
+}
+
+/**
+ * One tenant-scoped read producing the whole `/forecast` page.
+ *
+ * `getForecastData` stays as-is for the API route; this is the page-shaped view
+ * (current quarter only, with the overrides joined in and the list of quarters
+ * that actually have pipeline). Computed figures come from the pure rule
+ * modules; the override columns are the seller's explicit numbers and are never
+ * conflated with them.
+ */
+export async function getForecastOverview(ctx: TenantContext): Promise<ForecastOverview> {
+  if (!authorize(ctx, 'view')) {
+    throw forbidden('You do not have permission to view this organization');
+  }
+
+  const { opportunities, overrides } = await withTenant(ctx, async (tx) => {
+    const opportunityRows = await tx.dealOpportunity.findMany({
+      where: { organizationId: ctx.organizationId },
+      select: {
+        id: true,
+        organizationId: true,
+        accountId: true,
+        ownerId: true,
+        name: true,
+        stage: true,
+        amount: true,
+        closeDate: true,
+      },
+    });
+
+    const overrideRows = await tx.forecastOverride.findMany({
+      where: { organizationId: ctx.organizationId },
+      select: { id: true, month: true, committed: true, bestCase: true, pipeline: true },
+    });
+
+    const mapped = opportunityRows.map((op): Opportunity => ({
+      id: op.id,
+      organizationId: op.organizationId,
+      accountId: op.accountId,
+      ownerId: op.ownerId,
+      name: op.name,
+      stage: op.stage,
+      amount: op.amount,
+      closeDate: op.closeDate.toISOString().slice(0, 10),
+    }));
+
+    return { opportunities: mapped, overrides: overrideRows };
+  });
+
+  const open = opportunities.filter((op) => op.stage !== 'lost');
+  const lineByMonth = new Map(buildForecast(opportunities).map((line) => [line.month, line]));
+  const overrideByMonth = new Map(overrides.map((row) => [row.month, row]));
+
+  const quarter = currentQuarter(new Date());
+  const quarterMonths = monthsOfQuarter(quarter) ?? [];
+
+  const months: ForecastOverviewMonth[] = quarterMonths.map((month) => {
+    const line = lineByMonth.get(month);
+    const override = overrideByMonth.get(month);
+
+    return {
+      month,
+      computedAmount: line?.amount ?? 0,
+      computedWeighted: line?.weightedAmount ?? 0,
+      confidence: line?.confidence ?? 0,
+      opportunityCount: line?.opportunityCount ?? 0,
+      override: override
+        ? {
+            id: override.id,
+            committed: override.committed,
+            bestCase: override.bestCase,
+            pipeline: override.pipeline,
+          }
+        : null,
+    };
+  });
+
+  const quarterOpportunities = open.filter((op) =>
+    quarterMonths.includes(op.closeDate.slice(0, 7)),
+  );
+
+  const byQuarter = new Map<string, { committed: number; opportunityCount: number }>();
+  for (const op of open) {
+    const key = quarterOf(op.closeDate.slice(0, 7));
+    if (!key) continue;
+
+    const entry = byQuarter.get(key) ?? { committed: 0, opportunityCount: 0 };
+    entry.committed += op.amount;
+    entry.opportunityCount += 1;
+    byQuarter.set(key, entry);
+  }
+
+  const quarters = [...byQuarter.entries()]
+    .map(([key, value]) => ({ quarter: key, ...value }))
+    .sort((a, b) => b.quarter.localeCompare(a.quarter));
+
+  return {
+    quarter,
+    months,
+    totals: {
+      pipelineTotal: totalPipeline(opportunities),
+      weightedTotal: totalWeightedForecast(opportunities),
+      opportunityCount: open.length,
+      quarterCommitted: totalPipeline(quarterOpportunities),
+      quarterWeighted: totalWeightedForecast(quarterOpportunities),
+      quarterOpportunities: quarterOpportunities.length,
+    },
+    quarters,
+  };
 }

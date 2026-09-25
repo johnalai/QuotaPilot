@@ -11,28 +11,9 @@ import { getSessionServer } from '@/lib/auth/session';
 import { withTenant } from '@/lib/db/tenancy/tenant-ctx';
 import { formatCurrency } from '@/lib/utils/format-currency';
 
+import { formatMonthLabel, monthsOfQuarter } from '@/features/forecast/quarters';
+
 import { ForecastQuarterForm, type ForecastQuarterRow } from './forecast-quarter-form';
-
-const QUARTER_PATTERN = /^(\d{4})-Q([1-4])$/;
-
-/** `2026-Q1` → `['2026-01', '2026-02', '2026-03']`; null when malformed. */
-function monthsOfQuarter(quarter: string): string[] | null {
-  const match = QUARTER_PATTERN.exec(quarter);
-  if (!match) return null;
-
-  const [, year, quarterNumber] = match;
-  const firstMonth = (Number(quarterNumber) - 1) * 3 + 1;
-
-  return [0, 1, 2].map((offset) => `${year}-${String(firstMonth + offset).padStart(2, '0')}`);
-}
-
-function formatMonth(month: string): string {
-  return new Date(`${month}-01T00:00:00Z`).toLocaleString('en-US', {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-}
 
 /**
  * `/forecast/[quarter]` — quarter drill-down (route-map §3.5).
@@ -77,7 +58,7 @@ export default async function ForecastQuarterPage({
 
     const overrideRows = await tx.forecastOverride.findMany({
       where: { organizationId: ctx.organizationId, month: { in: months } },
-      select: { month: true, committed: true, bestCase: true, pipeline: true },
+      select: { id: true, month: true, committed: true, bestCase: true, pipeline: true },
     });
 
     const mapped: Opportunity[] = opportunityRows.map((op) => ({
@@ -105,7 +86,7 @@ export default async function ForecastQuarterPage({
 
     return {
       month,
-      label: formatMonth(month),
+      label: formatMonthLabel(month),
       computedAmount: line?.amount ?? 0,
       computedWeighted: line?.weightedAmount ?? 0,
       confidence: line?.confidence ?? 0,
@@ -114,6 +95,7 @@ export default async function ForecastQuarterPage({
       bestCase: override?.bestCase ?? 0,
       pipeline: override?.pipeline ?? 0,
       hasOverride: Boolean(override),
+      overrideId: override?.id ?? null,
     };
   });
 

@@ -21,6 +21,8 @@ export interface ForecastQuarterRow {
   bestCase: number;
   pipeline: number;
   hasOverride: boolean;
+  /** Id of the stored override row, so it can be cleared. Null when unset. */
+  overrideId: string | null;
 }
 
 interface Draft {
@@ -83,6 +85,39 @@ export function ForecastQuarterForm({
     if (committed > bestCase) return 'Committed cannot exceed best case.';
     if (bestCase > pipeline) return 'Best case cannot exceed pipeline.';
     return null;
+  }
+
+  const [clearing, setClearing] = useState<string | null>(null);
+
+  /** Delete the stored override for a month, returning it to "no override". */
+  async function handleClear(row: ForecastQuarterRow) {
+    if (!row.overrideId) return;
+
+    setClearing(row.month);
+    setStatus(null);
+
+    try {
+      const res = await fetch(`/api/forecast/overrides/${row.overrideId}`, { method: 'DELETE' });
+      const json = (await res.json()) as { ok: boolean; error?: { message?: string } };
+
+      if (!json.ok) {
+        setStatus({
+          kind: 'error',
+          text: `${row.label}: ${json.error?.message ?? 'clear failed'}`,
+        });
+        return;
+      }
+
+      setStatus({ kind: 'ok', text: `Cleared the override for ${row.label}.` });
+      router.refresh();
+    } catch (error) {
+      setStatus({
+        kind: 'error',
+        text: error instanceof Error ? error.message : 'Network error',
+      });
+    } finally {
+      setClearing(null);
+    }
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -170,6 +205,7 @@ export function ForecastQuarterForm({
               <th className="p-3 text-left font-medium">Committed</th>
               <th className="p-3 text-left font-medium">Best case</th>
               <th className="p-3 text-left font-medium">Pipeline</th>
+              <th className="p-3 text-right font-medium">Override</th>
             </tr>
           </thead>
           <tbody>
@@ -230,6 +266,21 @@ export function ForecastQuarterForm({
                       aria-invalid={Boolean(rowError)}
                       className="w-28"
                     />
+                  </td>
+                  <td className="p-3 text-right">
+                    {row.overrideId ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleClear(row)}
+                        disabled={clearing === row.month}
+                      >
+                        {clearing === row.month ? 'Clearing…' : 'Clear'}
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </td>
                 </tr>
               );

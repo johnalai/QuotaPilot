@@ -18,12 +18,12 @@ plus a sweep of every internal link — not a rename of the group.
 
 **Built so far** (Phase 1 + Phase 2a):
 
-| Area            | Routes                                                                                                                                                                                                                             |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Public          | `/`                                                                                                                                                                                                                                |
-| Auth            | `/login` · `/register`                                                                                                                                                                                                             |
-| Dashboard group | `/dashboard` · `/accounts` · `/accounts/[accountId]` · `/actions` · `/call-coach` · `/forecast` · `/opportunities` · `/opportunities/[opportunityId]` · `/quota` · `/ramp` · `/weekly-review`                                      |
-| API             | `/api/auth/[...nextauth]` · `/api/session` · `/api/health` · `/api/forecast` (GET) · `/api/forecast/overrides` (GET) · `/api/forecast/overrides/[id]` (DELETE) · `/api/forecast/values` (PATCH) · `/api/forecast/recompute` (POST) |
+| Area            | Routes                                                                                                                                                                                        |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Public          | `/`                                                                                                                                                                                           |
+| Auth            | `/login` · `/register`                                                                                                                                                                        |
+| Dashboard group | `/dashboard` · `/accounts` · `/accounts/[accountId]` · `/actions` · `/call-coach` · `/forecast` · `/opportunities` · `/opportunities/[opportunityId]` · `/quota` · `/ramp` · `/weekly-review` |
+| API             | `/api/auth/[...nextauth]` · `/api/session` · `/api/health` · `/api/forecast/overrides/[id]` (DELETE) · `/api/forecast/values` (PATCH) · `/api/forecast/recompute` (POST)                      |
 
 **Planned, not yet built** — the tables below describe the target state; the following are
 still outstanding: `/invite/[token]` · `/reset-password` · `/pricing` · `/legal/{privacy,terms}` ·
@@ -107,10 +107,10 @@ Shell layout renders sidebar (Dashboard, Actions, Quota, Accounts, Opportunities
 
 ### 3.5 Forecast
 
-| Route                 | Kind     | Notes                                                                                                                                    |
-| --------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `/forecast`           | SRC      | Current quarter: committed/best-case/pipeline per owner, total vs target, risk count, `RECOMPUTE` action                                 |
-| `/forecast/[quarter]` | SRC + CC | Drill-down per owner; edit committed/best-case/pipeline (CC form → SA); AI assistant proposes risk flags (suggest-only, §8 architecture) |
+| Route                 | Kind     | Notes                                                                                                                                                                                                                                    |
+| --------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/forecast`           | SRC      | Current quarter: totals, per-month computed vs override, links to each quarter, `RECOMPUTE` action. Reads through the forecast service; editing lives on the drill-down. **Outstanding: per-owner breakdown, quota target, risk count.** |
+| `/forecast/[quarter]` | SRC + CC | Drill-down per owner; edit committed/best-case/pipeline (CC form → SA); AI assistant proposes risk flags (suggest-only, §8 architecture)                                                                                                 |
 
 ### 3.6 Daily actions
 
@@ -164,9 +164,7 @@ All require a session; all validate with zod; all delegate to services with `Ten
 | `/api/auth/[...nextauth]`      | *      | —             | Auth.js handler (sign-in/out, session)                                           |
 | `/api/session`                 | GET    | session       | Non-sensitive session projection (org id, onboarding state) for client bootstrap |
 | `/api/health`                  | GET    | —             | Liveness probe                                                                   |
-| `/api/forecast`                | GET    | session + org | Computed forecast (lines, totals, quarter totals) from open opportunities        |
-| `/api/forecast/overrides`      | GET    | session + org | List `ForecastOverride` rows for the org                                         |
-| `/api/forecast/overrides/[id]` | DELETE | session + org | Delete one override                                                              |
+| `/api/forecast/overrides/[id]` | DELETE | session + org | Delete one override (the drill-down's Clear action)                              |
 | `/api/forecast/values`         | PATCH  | session + org | Upsert override; enforces `committed ≤ bestCase ≤ pipeline` (minor units)        |
 | `/api/forecast/recompute`      | POST   | session + org | `RecomputeForecast(quarter)` → recompute weighted + risk signals                 |
 
@@ -244,14 +242,15 @@ src/app/
   (dashboard)/accounts/page.tsx  (dashboard)/accounts/[accountId]/page.tsx
   (dashboard)/actions/page.tsx
   (dashboard)/call-coach/page.tsx
-  (dashboard)/forecast/page.tsx  (dashboard)/forecast/[quarter]/page.tsx
+  (dashboard)/forecast/page.tsx  (dashboard)/forecast/recompute-button.tsx
+  (dashboard)/forecast/[quarter]/page.tsx  (dashboard)/forecast/[quarter]/forecast-quarter-form.tsx
   (dashboard)/opportunities/page.tsx  (dashboard)/opportunities/[opportunityId]/page.tsx
   (dashboard)/quota/page.tsx
   (dashboard)/ramp/page.tsx
   (dashboard)/weekly-review/page.tsx
   api/auth/[...nextauth]/route.ts  api/session/route.ts  api/health/route.ts
-  api/forecast/route.ts  api/forecast/values/route.ts  api/forecast/recompute/route.ts
-  api/forecast/overrides/route.ts  api/forecast/overrides/[id]/route.ts
+  api/forecast/values/route.ts  api/forecast/recompute/route.ts
+  api/forecast/overrides/[id]/route.ts
 ```
 
 **Planned files (not yet created):**
