@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { RegisterForm } from './register-form';
 
 /**
  * Sign-up. Phase 1 creates `User` + `Organization` + `Membership(owner)` in one
@@ -14,9 +14,7 @@ export function RegisterPage() {
           <CardDescription>First user of an org becomes its owner (Phase 1).</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button type="button" disabled className="w-full">
-            Register
-          </Button>
+          <RegisterForm />
         </CardContent>
       </Card>
     </main>

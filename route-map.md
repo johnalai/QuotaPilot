@@ -1,9 +1,37 @@
 # QuotaPilot — Route Map
 
-**Status:** Approved for planning · **Date:** 2026-09-14
+**Status:** Approved for planning · **Plan date:** 2026-09-14 · **Paths reconciled to implementation:** 2026-09-24
 **Companion docs:** [architecture.md](architecture.md), [domain-model.md](domain-model.md), [implementation-plan.md](implementation-plan.md)
 
-Legend: **SRC** = server component (RSC, loads via service) · **CC** = client component island · **SA** = Server Action · **RH** = Route Handler · **guard** = middleware/route-level auth+tenant+onboarding gate. All `/app`, `/api/ai`, and mutation routes require a session; tenant scoping from `request.jwt.claims` (see architecture §7).
+Legend: **SRC** = server component (RSC, loads via service) · **CC** = client component island · **SA** = Server Action · **RH** = Route Handler · **guard** = middleware/route-level auth+tenant+onboarding gate. All authenticated routes and mutation routes require a session; tenant scoping comes from `request.jwt.claims` (see architecture §7).
+
+---
+
+## 0. Implementation divergence (read this first)
+
+The original plan below used an `(app)` route group and an `/app/*` URL prefix. The
+implementation uses a **`(dashboard)`** group and **unprefixed URLs** (`/dashboard`, not
+`/app/dashboard`). Paths in this document have been rewritten to match the code.
+
+If the `/app/*` prefix is still wanted, it is a route-segment change (`(dashboard)/app/…`)
+plus a sweep of every internal link — not a rename of the group.
+
+**Built so far** (Phase 1 + Phase 2a):
+
+| Area            | Routes                                                                                                                                                                                                                             |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Public          | `/`                                                                                                                                                                                                                                |
+| Auth            | `/login` · `/register`                                                                                                                                                                                                             |
+| Dashboard group | `/dashboard` · `/accounts` · `/accounts/[accountId]` · `/actions` · `/call-coach` · `/forecast` · `/opportunities` · `/opportunities/[opportunityId]` · `/quota` · `/ramp` · `/weekly-review`                                      |
+| API             | `/api/auth/[...nextauth]` · `/api/session` · `/api/health` · `/api/forecast` (GET) · `/api/forecast/overrides` (GET) · `/api/forecast/overrides/[id]` (DELETE) · `/api/forecast/values` (PATCH) · `/api/forecast/recompute` (POST) |
+
+**Planned, not yet built** — the tables below describe the target state; the following are
+still outstanding: `/invite/[token]` · `/reset-password` · `/pricing` · `/legal/{privacy,terms}` ·
+`/accounts/new` · `/actions/today` (sections 3.3, 3.6) · all of `/prep*` · `/practice*` ·
+`/objections` · all of `/settings*` · `/api/ai/*` · `/api/import/csv` · `/api/invites`.
+
+Two implemented routes are **not in the original plan** and are additive:
+`/call-coach` · `/weekly-review` · `/ramp` (which fulfils the planned `/onboarding` wizard slot).
 
 ---
 
@@ -13,13 +41,13 @@ Runs on eligible routes, resolves session cookie → hydrates a lightweight `Ten
 
 ### Guard matrix
 
-| Route group                               | Auth required | Org required | Onboarding required     | Notes                                                                                  |
-| ----------------------------------------- | ------------- | ------------ | ----------------------- | -------------------------------------------------------------------------------------- |
-| `/` `/(marketing)/*` `/login` `/register` | no            | —            | —                       | public                                                                                 |
-| `/invite/[token]`                         | partial       | —            | —                       | token validates in handler; redirects to `/login` if unauthenticated (preserves token) |
-| `/app` `/**`                              | **yes**       | **yes**      | yes except `onboarding` | missing org → `/app/onboarding`                                                        |
-| `/app/onboarding`                         | yes           | no           | —                       | ramp wizard                                                                            |
-| `/app/settings/members`                   | yes           | yes, `admin  | owner` role             | yes                                                                                    | role check in service layer |
+| Route group                               | Auth required | Org required | Onboarding required | Notes                                                                                  |
+| ----------------------------------------- | ------------- | ------------ | ------------------- | -------------------------------------------------------------------------------------- |
+| `/` `/(marketing)/*` `/login` `/register` | no            | —            | —                   | public                                                                                 |
+| `/invite/[token]`                         | partial       | —            | —                   | token validates in handler; redirects to `/login` if unauthenticated (preserves token) |
+| `/(dashboard)/**`                         | **yes**       | **yes**      | yes except `ramp`   | missing org → `/ramp`                                                                  |
+| `/ramp`                                   | yes           | no           | —                   | ramp wizard (planned as `/onboarding`)                                                 |
+| `/settings/members`                       | yes           | yes, `admin  | owner` role         | yes                                                                                    | role check in service layer |
 
 ---
 
@@ -38,84 +66,90 @@ Runs on eligible routes, resolves session cookie → hydrates a lightweight `Ten
 | Route             | Kind         | Handler notes                                                                                                       |
 | ----------------- | ------------ | ------------------------------------------------------------------------------------------------------------------- |
 | `/login`          | SRC+CC       | Credentials form → Auth.js `signIn`; redirect `?callbackUrl`                                                        |
-| `/register`       | SRC+CC       | Create user → create org (owner) → redirect `/app/onboarding`                                                       |
+| `/register`       | SRC+CC       | Create user → create org (owner) → redirect `/ramp`                                                                 |
 | `/invite/[token]` | SRC+SA or RH | Validates `Invite` (unexpired, unused); if authed → accept + join; else → `/login?invite=…`; errors → friendly page |
 | `/reset-password` | SRC+SA       | Phase 1.5: token-based reset (email transport = dev mailer first)                                                   |
 
 ---
 
-## 3. Authenticated app shell (`(app)` group)
+## 3. Authenticated app shell (`(dashboard)` group)
 
 Shell layout renders sidebar (Dashboard, Actions, Quota, Accounts, Opportunities, Forecast, Prep, Practice, Settings) + org switcher (phase 2). Resolves `TenantContext` once per request via RSC.
 
 ### 3.1 Dashboard / ramp
 
-| Route             | Kind                | Notes                                                                                                                                                                                              |
-| ----------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/app`            | redirect            | → `/app/dashboard`                                                                                                                                                                                 |
-| `/app/dashboard`  | SRC + CC tiles      | Today's action plan (`ActionTask[]`, top 5) · quota progress rail (target vs booked, current period) · forecast snapshot (committed/best-case/pipeline + risk count) · next scheduled meeting card |
-| `/app/onboarding` | SRC + multi-step CC | Steps: role+term → org/team → quota setup → (skip) CSV/CRM import → done. Progress stored in `User.onboarded_at` on completion.                                                                    |
+| Route        | Kind                | Notes                                                                                                                                                                                              |
+| ------------ | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/dashboard` | SRC + CC tiles      | Today's action plan (`ActionTask[]`, top 5) · quota progress rail (target vs booked, current period) · forecast snapshot (committed/best-case/pipeline + risk count) · next scheduled meeting card |
+| `/ramp`      | SRC + multi-step CC | Ramp wizard. Steps: role+term → org/team → quota setup → (skip) CSV/CRM import → done. Progress stored in `User.onboarded_at` on completion.                                                       |
 
 ### 3.2 Quota
 
-| Route                 | Kind     | Notes                                                                                            |
-| --------------------- | -------- | ------------------------------------------------------------------------------------------------ |
-| `/app/quota`          | SRC      | Current QuotaPlan: target, components, period progress bar, breakdown by component; edit (admin) |
-| `/app/quota/[planId]` | SRC + CC | Plan detail/history; CRUD via SAs (admin)                                                        |
+| Route             | Kind     | Notes                                                                                            |
+| ----------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `/quota`          | SRC      | Current QuotaPlan: target, components, period progress bar, breakdown by component; edit (admin) |
+| `/quota/[planId]` | SRC + CC | Plan detail/history; CRUD via SAs (admin)                                                        |
 
 ### 3.3 Accounts
 
-| Route                       | Kind     | Notes                                                                                                     |
-| --------------------------- | -------- | --------------------------------------------------------------------------------------------------------- |
-| `/app/accounts`             | SRC + CC | List w/ filter (priority tier, region, industry, owner), sort by priority score; row actions              |
-| `/app/accounts/new`         | SRC + CC | Form → `CREATE_ACCOUNT` SA (zod-validated) → recompute priority                                           |
-| `/app/accounts/[accountId]` | SRC + CC | Detail: profile, tech_stack, opportunities, meetings, next best prep (`GeneratePrep` CTA), notes, actions |
+| Route                   | Kind     | Notes                                                                                                     |
+| ----------------------- | -------- | --------------------------------------------------------------------------------------------------------- |
+| `/accounts`             | SRC + CC | List w/ filter (priority tier, region, industry, owner), sort by priority score; row actions              |
+| `/accounts/new`         | SRC + CC | Form → `CREATE_ACCOUNT` SA (zod-validated) → recompute priority                                           |
+| `/accounts/[accountId]` | SRC + CC | Detail: profile, tech_stack, opportunities, meetings, next best prep (`GeneratePrep` CTA), notes, actions |
 
 ### 3.4 Opportunities
 
-| Route                        | Kind     | Notes                                                                                                                                                    |
-| ---------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/app/opportunities`         | SRC + CC | Pipeline table: amount, weighted value, stage, risk score chip, close date; filters/sorts                                                                |
-| `/app/opportunities/[oppId]` | SRC + CC | Detail: stage progress, risk signals list (rules), revenue notes (user-entered only — AI never writes financial fields), forecast placement, meeting log |
+| Route                            | Kind     | Notes                                                                                                                                                    |
+| -------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/opportunities`                 | SRC + CC | Pipeline table: amount, weighted value, stage, risk score chip, close date; filters/sorts                                                                |
+| `/opportunities/[opportunityId]` | SRC + CC | Detail: stage progress, risk signals list (rules), revenue notes (user-entered only — AI never writes financial fields), forecast placement, meeting log |
 
 ### 3.5 Forecast
 
-| Route                     | Kind     | Notes                                                                                                                                    |
-| ------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `/app/forecast`           | SRC      | Current quarter: committed/best-case/pipeline per owner, total vs target, risk count, `RECOMPUTE` action                                 |
-| `/app/forecast/[quarter]` | SRC + CC | Drill-down per owner; edit committed/best-case/pipeline (CC form → SA); AI assistant proposes risk flags (suggest-only, §8 architecture) |
+| Route                 | Kind     | Notes                                                                                                                                    |
+| --------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `/forecast`           | SRC      | Current quarter: committed/best-case/pipeline per owner, total vs target, risk count, `RECOMPUTE` action                                 |
+| `/forecast/[quarter]` | SRC + CC | Drill-down per owner; edit committed/best-case/pipeline (CC form → SA); AI assistant proposes risk flags (suggest-only, §8 architecture) |
 
 ### 3.6 Daily actions
 
-| Route                | Kind | Notes                                                                              |
-| -------------------- | ---- | ---------------------------------------------------------------------------------- |
-| `/app/actions`       | SRC  | All open ActionTasks grouped by day, priority sorted; toggle done/skip inline (SA) |
-| `/app/actions/today` | SRC  | Today only; dense checklist UI; regenerate (SA `REFRESH_PLAN`)                     |
+| Route            | Kind | Notes                                                                              |
+| ---------------- | ---- | ---------------------------------------------------------------------------------- |
+| `/actions`       | SRC  | All open ActionTasks grouped by day, priority sorted; toggle done/skip inline (SA) |
+| `/actions/today` | SRC  | Today only; dense checklist UI; regenerate (SA `REFRESH_PLAN`)                     |
 
 ### 3.7 Prep (call & demo prep — one of the two MVP AI features)
 
-| Route                            | Kind     | Notes                                                                                 |
-| -------------------------------- | -------- | ------------------------------------------------------------------------------------- |
-| `/app/prep`                      | SRC      | Recent PrepDocuments + "new prep" builder (pick account, kind)                        |
-| `/app/prep/new?account=…&kind=…` | CC       | Builder → RH `POST /api/ai/prep` (streaming) → live doc                               |
-| `/app/prep/[prepId]`             | SRC + CC | Rendered PrepDocument (structured sections), regenerate (new version), copy/export MD |
+| Route                        | Kind     | Notes                                                                                 |
+| ---------------------------- | -------- | ------------------------------------------------------------------------------------- |
+| `/prep`                      | SRC      | Recent PrepDocuments + "new prep" builder (pick account, kind)                        |
+| `/prep/new?account=…&kind=…` | CC       | Builder → RH `POST /api/ai/prep` (streaming) → live doc                               |
+| `/prep/[prepId]`             | SRC + CC | Rendered PrepDocument (structured sections), regenerate (new version), copy/export MD |
 
 ### 3.8 Practice (objection handling — the other MVP AI feature)
 
-| Route                       | Kind                | Notes                                                                                  |
-| --------------------------- | ------------------- | -------------------------------------------------------------------------------------- |
-| `/app/practice`             | SRC + CC            | Scoreboard of past PracticeSessions + start new (pick objection/scenario)              |
-| `/app/practice/[sessionId]` | CC (streaming chat) | Chat that role-plays the objection; on end → AI feedback + score, saved; usage metered |
-| `/app/objections`           | SRC + CC            | Org playbook CRUD (severity, talk_track, notes)                                        |
+| Route                   | Kind                | Notes                                                                                  |
+| ----------------------- | ------------------- | -------------------------------------------------------------------------------------- |
+| `/practice`             | SRC + CC            | Scoreboard of past PracticeSessions + start new (pick objection/scenario)              |
+| `/practice/[sessionId]` | CC (streaming chat) | Chat that role-plays the objection; on end → AI feedback + score, saved; usage metered |
+| `/objections`           | SRC + CC            | Org playbook CRUD (severity, talk_track, notes)                                        |
 
 ### 3.9 Settings
 
-| Route                        | Kind     | Role            | Notes                                                                       |
-| ---------------------------- | -------- | --------------- | --------------------------------------------------------------------------- |
-| `/app/settings`              | SRC      | member          | Profile (name, tz, locale), password change                                 |
-| `/app/settings/members`      | SRC + CC | **admin/owner** | Membership list, invite form (SA → creates Invite), role change, deactivate |
-| `/app/settings/integrations` | SRC      | admin/owner     | **Stage 2 placeholder**: CRM connector status (empty state)                 |
-| `/app/settings/billing`      | SRC      | owner           | **Stage 2 placeholder**                                                     |
+| Route                    | Kind     | Role            | Notes                                                                       |
+| ------------------------ | -------- | --------------- | --------------------------------------------------------------------------- |
+| `/settings`              | SRC      | member          | Profile (name, tz, locale), password change                                 |
+| `/settings/members`      | SRC + CC | **admin/owner** | Membership list, invite form (SA → creates Invite), role change, deactivate |
+| `/settings/integrations` | SRC      | admin/owner     | **Stage 2 placeholder**: CRM connector status (empty state)                 |
+| `/settings/billing`      | SRC      | owner           | **Stage 2 placeholder**                                                     |
+
+### 3.10 Additional implemented routes (not in the original plan)
+
+| Route            | Kind     | Notes                                       |
+| ---------------- | -------- | ------------------------------------------- |
+| `/call-coach`    | SRC + CC | Call coaching surface (Phase 2a)            |
+| `/weekly-review` | SRC + CC | Weekly review with risk snapshot (Phase 2a) |
 
 ---
 
@@ -123,17 +157,30 @@ Shell layout renders sidebar (Dashboard, Actions, Quota, Accounts, Opportunities
 
 All require a session; all validate with zod; all delegate to services with `TenantContext`. Streaming responses use SSE/incremental chunks.
 
-| Endpoint                  | Method | Guards                      | Purpose → Service                                                                                 | Streaming                                         |
-| ------------------------- | ------ | --------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `/api/session`            | GET    | session                     | Return non-sensitive session projection (org id, role, onboarding state) for client bootstrapping | —                                                 |
-| `/api/ai/prep`            | POST   | session + org + feature cap | `GeneratePrep(doc: {accountId, kind, focus?})` via `AiService` → `PrepDocument`                   | yes                                               |
-| `/api/ai/practice`        | POST   | session + org + cap         | `PracticeTurn(message)` — role-play turn, usage logged                                            | yes                                               |
-| `/api/ai/practice/end`    | POST   | session + org               | `ScorePractice(sessionId)` → writes score jsonb                                                   | yes                                               |
-| `/api/ai/plan`            | POST   | session + org               | `RefreshActionPlan(userId)` → regenerate today's tasks                                            | —                                                 |
-| `/api/import/csv`         | POST   | session + org, admin        | `ImportCsv({type: accounts                                                                        | opportunities, rows[]})` → dry-run result + apply | no (but large sets → chunked status) |
-| `/api/invites`            | POST   | session + org, admin        | `CreateInvite(email, role)`                                                                       | —                                                 |
-| `/api/forecast/recompute` | POST   | session + org               | `RecomputeForecast(quarter)` → recompute weighted + risk signals                                  | —                                                 |
-| `/api/integrations/*`     | —      | —                           | **Deferred to Phase 6** (webhooks for CRM sync)                                                   | —                                                 |
+### 4.1 Implemented
+
+| Endpoint                       | Method | Guards        | Purpose → Service                                                                |
+| ------------------------------ | ------ | ------------- | -------------------------------------------------------------------------------- |
+| `/api/auth/[...nextauth]`      | *      | —             | Auth.js handler (sign-in/out, session)                                           |
+| `/api/session`                 | GET    | session       | Non-sensitive session projection (org id, onboarding state) for client bootstrap |
+| `/api/health`                  | GET    | —             | Liveness probe                                                                   |
+| `/api/forecast`                | GET    | session + org | Computed forecast (lines, totals, quarter totals) from open opportunities        |
+| `/api/forecast/overrides`      | GET    | session + org | List `ForecastOverride` rows for the org                                         |
+| `/api/forecast/overrides/[id]` | DELETE | session + org | Delete one override                                                              |
+| `/api/forecast/values`         | PATCH  | session + org | Upsert override; enforces `committed ≤ bestCase ≤ pipeline` (minor units)        |
+| `/api/forecast/recompute`      | POST   | session + org | `RecomputeForecast(quarter)` → recompute weighted + risk signals                 |
+
+### 4.2 Planned
+
+| Endpoint               | Method | Guards                      | Purpose → Service                                                               | Streaming                            |
+| ---------------------- | ------ | --------------------------- | ------------------------------------------------------------------------------- | ------------------------------------ |
+| `/api/ai/prep`         | POST   | session + org + feature cap | `GeneratePrep(doc: {accountId, kind, focus?})` via `AiService` → `PrepDocument` | yes                                  |
+| `/api/ai/practice`     | POST   | session + org + cap         | `PracticeTurn(message)` — role-play turn, usage logged                          | yes                                  |
+| `/api/ai/practice/end` | POST   | session + org               | `ScorePractice(sessionId)` → writes score jsonb                                 | yes                                  |
+| `/api/ai/plan`         | POST   | session + org               | `RefreshActionPlan(userId)` → regenerate today's tasks                          | —                                    |
+| `/api/import/csv`      | POST   | session + org, admin        | `ImportCsv({type: accounts \| opportunities, rows[]})` → dry-run result + apply | no (but large sets → chunked status) |
+| `/api/invites`         | POST   | session + org, admin        | `CreateInvite(email, role)`                                                     | —                                    |
+| `/api/integrations/*`  | —      | —                           | **Deferred to Phase 6** (webhooks for CRM sync)                                 | —                                    |
 
 **Error contract:** consistent envelope `{ ok:false, error:{ code, message, details? } }`; codes enumerated (`VALIDATION`, `FORBIDDEN`, `NOT_FOUND`, `TENANT_VIOLATION`, `AI_QUOTA`, `RATE_LIMITED`). Financial fields never echo model output.
 
@@ -154,6 +201,9 @@ All require a session; all validate with zod; all delegate to services with `Ten
 | `ACCEPT_INVITE`                                              | invite route     | Membership service                                                          | single-use token                          |
 
 All SAs: zod input schema, `authorize(ctx, ability)` check, revalidate affected path tags.
+**Abilities are the vocabulary in `lib/permissions/abilities.ts`:** `view` · `mutate` ·
+`manage_members` · `manage_settings` · `manage_org`. `authorize(ctx, ability)` returns a
+**boolean** and requires `ctx.role` — never destructure it.
 
 ---
 
@@ -170,37 +220,52 @@ Server Actions and Route Handlers call `revalidateTag` for the tags their write 
 ## 7. Onboarding funnel (route behavior)
 
 ```
-/register → org(owner) → /app/onboarding  ──wizard──►  complete
-   │                                          ▲ (skip)   │
-   │  User has org but !onboarded_at          │          ▼
-   └──────────────────────────────────────────┘   /app/dashboard (all tags warm)
+/register → org(owner) → /ramp  ──wizard──►  complete
+   │                              ▲ (skip)   │
+   │  User has org but !onboarded_at          │
+   └─────────────────────────────────────────┘   /dashboard (all tags warm)
 ```
 
-- `!onboarded_at` user hitting any `/app/*` (except onboarding) → redirect `/app/onboarding`.
+- `!onboarded_at` user hitting any `/(dashboard)/*` (except `ramp`) → redirect `/ramp`.
 - Wizard step state kept server-side per user (no fragile client localStorage); "skip" marks `onboarded_at` and surfaces a slim empty state.
 
 ---
 
-## 8. Route → file map (scaffolding reference)
+## 8. Route → file map (as implemented)
 
 ```
 src/app/
   layout.tsx
-  (marketing)/page.tsx  (marketing)/pricing/page.tsx  (marketing)/legal/{privacy,terms}/page.tsx
+  (marketing)/page.tsx
   (auth)/login/page.tsx  (auth)/register/page.tsx
-  (auth)/invite/[token]/page.tsx
-  api/session/route.ts  api/ai/prep/route.ts  api/ai/practice/route.ts
-  api/ai/practice/end/route.ts  api/ai/plan/route.ts
-  api/import/csv/route.ts  api/invites/route.ts  api/forecast/recompute/route.ts
-  (app)/layout.tsx  (app)/dashboard/page.tsx  (app)/onboarding/page.tsx
-  (app)/quota/page.tsx  (app)/quota/[planId]/page.tsx
-  (app)/accounts/page.tsx  (app)/accounts/new/page.tsx  (app)/accounts/[accountId]/page.tsx
-  (app)/opportunities/page.tsx  (app)/opportunities/[oppId]/page.tsx
-  (app)/forecast/page.tsx  (app)/forecast/[quarter]/page.tsx
-  (app)/actions/page.tsx  (app)/actions/today/page.tsx
-  (app)/prep/page.tsx  (app)/prep/new/page.tsx  (app)/prep/[prepId]/page.tsx
-  (app)/practice/page.tsx  (app)/practice/[sessionId]/page.tsx
-  (app)/objections/page.tsx
-  (app)/settings/page.tsx  (app)/settings/members/page.tsx
-  (app)/settings/integrations/page.tsx  (app)/settings/billing/page.tsx
+  (auth)/login/actions.ts  (auth)/register/actions.ts
+  (dashboard)/layout.tsx
+  (dashboard)/dashboard/page.tsx
+  (dashboard)/accounts/page.tsx  (dashboard)/accounts/[accountId]/page.tsx
+  (dashboard)/actions/page.tsx
+  (dashboard)/call-coach/page.tsx
+  (dashboard)/forecast/page.tsx  (dashboard)/forecast/[quarter]/page.tsx
+  (dashboard)/opportunities/page.tsx  (dashboard)/opportunities/[opportunityId]/page.tsx
+  (dashboard)/quota/page.tsx
+  (dashboard)/ramp/page.tsx
+  (dashboard)/weekly-review/page.tsx
+  api/auth/[...nextauth]/route.ts  api/session/route.ts  api/health/route.ts
+  api/forecast/route.ts  api/forecast/values/route.ts  api/forecast/recompute/route.ts
+  api/forecast/overrides/route.ts  api/forecast/overrides/[id]/route.ts
+```
+
+**Planned files (not yet created):**
+
+```
+  (marketing)/pricing/page.tsx  (marketing)/legal/{privacy,terms}/page.tsx
+  (auth)/invite/[token]/page.tsx  (auth)/reset-password/page.tsx
+  (dashboard)/accounts/new/page.tsx
+  (dashboard)/actions/today/page.tsx
+  (dashboard)/prep/page.tsx  (dashboard)/prep/new/page.tsx  (dashboard)/prep/[prepId]/page.tsx
+  (dashboard)/practice/page.tsx  (dashboard)/practice/[sessionId]/page.tsx
+  (dashboard)/objections/page.tsx
+  (dashboard)/settings/page.tsx  (dashboard)/settings/members/page.tsx
+  (dashboard)/settings/integrations/page.tsx  (dashboard)/settings/billing/page.tsx
+  api/ai/prep/route.ts  api/ai/practice/route.ts  api/ai/practice/end/route.ts  api/ai/plan/route.ts
+  api/import/csv/route.ts  api/invites/route.ts
 ```

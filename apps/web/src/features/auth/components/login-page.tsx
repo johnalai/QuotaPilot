@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { LoginForm } from './login-form';
 
 /**
  * Credentials sign-in. Phase 1 wires Auth.js `signIn` + `callbackUrl` and the
@@ -14,9 +14,7 @@ export function LoginPage() {
           <CardDescription>Credentials + Auth.js land in Phase 1.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button type="button" disabled className="w-full">
-            Sign in
-          </Button>
+          <LoginForm />
         </CardContent>
       </Card>
     </main>

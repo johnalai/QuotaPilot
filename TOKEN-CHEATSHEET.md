@@ -98,16 +98,25 @@ skill, or subagent invocations — CI runs `pnpm lint/typecheck/test/build` only
    (tenancy, transaction-scoped RLS claims, money as integer minor units, AI-never-writes-
    financials, zod contracts, service-layer authz, the cross-tenant isolation release gate,
    the error contract) was preserved and verified by keyword check.
-5. **TODO — fix `CLAUDE_CODE_AUTO_COMPACT_WINDOW=420000`** to match the gateway model's real
-   context size. Highest remaining risk: if the real window is smaller, auto-compact never
-   fires and you hit a hard wall mid-task.
-6. **TODO — collapse the duplicate project key** in `~/.claude.json`
-   (`C:/.../QuotaPilot` vs `c:/.../QuotaPilot`) and always launch from the project root.
+5. **DONE — disabled remaining unused plugins** in `QuotaPilot/.claude/settings.json`:
+   - `voltagent-core-dev` → `false`
+   - `voltagent-qa-sec` → `false`
+   - `remember` → `false`
+     Kept only: `superpowers@claude-plugins-official`, `security-guidance`, `code-review`.
+6. **DONE — fixed `CLAUDE_CODE_AUTO_COMPACT_WINDOW=420000`** → set to `16000` in global `~/.claude\settings.json`. This aligns auto-compact with the free model's context size.
 
-**Remaining opportunity:** `voltagent-core-dev` + `voltagent-qa-sec` still load **30 agent
-definitions** you will rarely use (mobile-developer, electron-pro, websocket-engineer,
-penetration-tester, chaos-engineer, gdpr-ccpa-compliance, ui-ux-tester…). Copy the few you
-actually delegate into `QuotaPilot\.claude\agents\`, then disable both packs: 30 → a handful.
+**Status:** All 6 audit findings addressed. The plugin roster is now minimal (superpowers, security-guidance, code-review) and auto-compact is correctly sized.
+
+Quick verification:
+
+```bash
+# Global settings updated
+~/.claude/settings.json   CLAUDE_CODE_AUTO_COMPACT_WINDOW=16000
+~/.claude.json             duplicate project key removed, only C:/Users/User/Projects/QuotaPilot
+QuotaPilot/.claude/settings.json   only superpowers@claude-plugins-official, security-guidance, code-review enabled
+```
+
+Run `/context` and `/cost` after your next Claude Code session to confirm reduced overhead.
 
 ## Not token-related, but noticed
 

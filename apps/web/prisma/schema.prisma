@@ -54,6 +54,13 @@ model Organization {
   settings      Json      @default("{}")
   memberships   Membership[]
   invites       Invite[]
+  quotaPlans    QuotaPlan[]
+  customers     CustomerAccount[]
+  deals         DealOpportunity[]
+  forecastLines ForecastLine[]
+  riskSignals   RiskSignal[]
+  actionTasks   ActionTask[]
+  forecastOverrides ForecastOverride[]
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
@@ -74,6 +81,7 @@ model User {
   onboardedAt    DateTime?    @map("onboarded_at")
   memberships    Membership[]
   invitesCreated Invite[]     @relation("InviteCreator")
+  dealsOwned    DealOpportunity[]
   accounts       Account[]
   sessions       Session[]
   createdAt      DateTime     @default(now()) @map("created_at")
@@ -170,4 +178,200 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@map("verification_token")
+}
+// ── Domain models (Phase 2a) ──────────────────────────────────────────────────
+// All tenant-scoped: every table carries `organization_id` and is RLS-protected
+// by the same null-safe claim predicate used for membership/invite.
+// Computed fields (weightedAmount, risk scores, priority scores) are NOT
+// stored — they are produced by packages/domain/rules/* on read.
+
+enum QuotaPlanCurrency {
+  USD
+  EUR
+  GBP
+  CAD
+  AUD
+}
+
+enum AccountStage {
+  new
+  active
+  at_risk
+  churned
+}
+
+enum OpportunityStage {
+  prospecting
+  qualified
+  proposal
+  negotiation
+  won
+  lost
+}
+
+enum RiskSignalKind {
+  stale_opportunity
+  pipeline_gap
+  single_customer_concentration
+  forecast_slippage
+  deal_size_outlier
+  win_rate_decline
+}
+
+enum RiskSignalSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+enum ActionTaskKind {
+  call
+  demo
+  prep
+  review
+  outreach
+}
+
+enum ActionTaskStatus {
+  open
+  done
+  dismissed
+}
+
+model QuotaPlan {
+  id                       String            @id @default(cuid(2))
+  organizationId           String            @map("organization_id")
+  quotaAmount              Int               @map("quota_amount")
+  avgDealValue             Int               @map("avg_deal_value")
+  winRate                  Float             @map("win_rate")
+  opportunityConversionRate Float             @map("opportunity_conversion_rate")
+  discoveryConversionRate  Float             @map("discovery_conversion_rate")
+  firstMeetingConversionRate Float            @map("first_meeting_conversion_rate")
+  pipelineCoverageTarget   Float             @map("pipeline_coverage_target")
+  salesCycleMonths         Int               @map("sales_cycle_months")
+  quotaCurrency            QuotaPlanCurrency @map("quota_currency")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId])
+  @@index([organizationId])
+  @@map("quota_plan")
+}
+
+model CustomerAccount {
+  id            String        @id @default(cuid(2))
+  organizationId String       @map("organization_id")
+  name          String
+  industry      String?
+  segment       String?
+  stage         AccountStage  @default(new)
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  opportunities   DealOpportunity[]
+
+  @@index([organizationId])
+  @@index([stage])
+  @@map("customer")
+}
+
+model DealOpportunity {
+  id             String           @id @default(cuid(2))
+  organizationId String           @map("organization_id")
+  accountId      String           @map("account_id")
+  name           String
+  stage          OpportunityStage
+  amount         Int
+  closeDate      DateTime         @map("close_date")
+  ownerId        String           @map("owner_id")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  account      CustomerAccount           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  owner        User              @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  forecastLines ForecastLine[]
+  riskSignals   RiskSignal[]
+  actionTasks   ActionTask[]
+
+  @@index([organizationId])
+  @@index([accountId])
+  @@index([ownerId])
+  @@index([stage])
+  @@index([closeDate])
+  @@map("deal")
+}
+
+model ForecastLine {
+  id             String      @id @default(cuid(2))
+  organizationId String      @map("organization_id")
+  opportunityId  String      @map("opportunity_id")
+  month          String
+  amount         Int
+  confidence     Float
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  opportunity  DealOpportunity    @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, opportunityId, month])
+  @@index([organizationId])
+  @@index([month])
+  @@map("forecast_line")
+}
+
+model ForecastOverride {
+  id            String   @id @default(cuid(2))
+  organizationId String   @map("organization_id")
+  month         String   // YYYY-MM
+  committed     Int      // in minor units
+  bestCase      Int      // in minor units
+  pipeline      Int      // in minor units
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, month])
+  @@index([organizationId])
+  @@map("forecast_override")
+}
+
+model RiskSignal {
+  id             String           @id @default(cuid(2))
+  organizationId String           @map("organization_id")
+  opportunityId  String?          @map("opportunity_id")
+  kind           RiskSignalKind
+  severity       RiskSignalSeverity
+  message        String
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  opportunity  DealOpportunity?       @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([severity])
+  @@map("risk_signal")
+}
+
+model ActionTask {
+  id             String         @id @default(cuid(2))
+  organizationId String         @map("organization_id")
+  title          String
+  kind           ActionTaskKind
+  opportunityId  String?        @map("opportunity_id")
+  dueDate        DateTime       @map("due_date")
+  status         ActionTaskStatus @default(open)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  opportunity  DealOpportunity?       @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([dueDate])
+  @@index([status])
+  @@map("action_task")
 }
